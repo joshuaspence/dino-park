@@ -77,10 +77,12 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
 
 - **One hand-built park**, not procedural: a loop road with branches, about 2 minutes end to end,
   so any pen-to-station trip is 10–20 seconds.
-- **Launch roster (four):** Triceratops, Brachiosaurus (eats from trees: a tall leaf bundle),
-  Stegosaurus, and a friendly T. rex (meat).
+- **Launch roster (four):** Triceratops, Brontosaurus (eats from trees: a tall leaf bundle),
+  Stegosaurus, and a friendly T. rex (meat). The long-neck was originally a Brachiosaurus; it became a
+  Brontosaurus because the CC0 pack's sauropod is an Apatosaurus/Brontosaurus shape, and it's the
+  name children know.
 - Dinosaurs have short, easy names that are only ever spoken: **Trixie** the Triceratops, **Bruno**
-  the Brachiosaurus, **Steggy** the Stegosaurus, **Rex** the T. rex.
+  the Brontosaurus, **Steggy** the Stegosaurus, **Rex** the T. rex.
 - **Unlocks, in order, by hatching eggs:**
   1. **Velociraptor** — a small pack of three in one pen that hop and chirp in a circle; eats meat.
   2. **Pterodactyl** — an aviary (tall net dome) and a new fish-pond station. (A flying reptile,
@@ -141,7 +143,15 @@ Behind a **grown-up gate** (hold for 3 seconds, then tap a named number):
   `public/models/`, and `CREDITS.md` records each file's source and licence.
 - Models are loaded behind a **`DinoSkin`** interface so commissioned or Blender-made models can
   replace the packs without code changes.
-- The exact roster ↔ asset match is the first M1 task (the packs must be downloaded and audited).
+- **Asset audit (M1).** Quaternius's
+  [Animated Dinosaur Pack](https://quaternius.com/packs/animateddinosaurs.html) covers Triceratops,
+  Apatosaurus (used for the Brontosaurus), Stegosaurus, T. rex, Velociraptor and Parasaurolophus
+  (Rosie), each with Idle, Walk, Run, Jump, Attack and Death clips. `scripts/import-dinos.mjs`
+  converts it, keeps only idle/walk/run/jump — **jump is the happy hop** — and Meshopt-compresses it
+  (about 1.2 MB for all six). The models share one unit, so one scale keeps their relative sizes;
+  Rosie is scaled up because the pack's Parasaurolophus is small. Recolours are keyed by the pack's
+  material names. **Pterodactyl and Ankylosaurus have no model yet**: find one before M2, otherwise
+  build them procedurally.
 
 ## 9. Tech stack
 
