@@ -30,7 +30,7 @@ describe('headings', () => {
 
 describe('stepJeep', () => {
   it('stays parked without a route', () => {
-    const jeep = parkedJeep({ x: 1, z: 2 });
+    const jeep = parkedJeep({ x: 1, z: 2 }, 0.5);
     expect(stepJeep(jeep, 1)).toEqual(jeep);
   });
 
@@ -81,6 +81,20 @@ describe('stepJeep', () => {
       jeep = stepJeep(jeep, STEP);
     }
     expect(jeep.heading).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('finishes turning after a short trip that ends straight after a sharp turn', () => {
+    // Facing east, sent 0.5 m west: a half turn takes longer than the trip, so it must carry on once parked.
+    let jeep = driveAlong(parkedJeep({ x: 0, z: 24 }, Math.PI / 2), [{ x: -0.5, z: 24 }]);
+    while (jeep.route.length > 0) {
+      jeep = stepJeep(jeep, STEP);
+    }
+    expect(Math.abs(angleBetween(jeep.heading, -Math.PI / 2))).toBeGreaterThan(0.1);
+    for (let i = 0; i < 60; i++) {
+      jeep = stepJeep(jeep, STEP);
+    }
+    expect(angleBetween(jeep.heading, -Math.PI / 2)).toBeCloseTo(0);
+    expect(jeep.position).toEqual({ x: -0.5, z: 24 });
   });
 
   it('keeps its speed when given a new route mid-drive', () => {

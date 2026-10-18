@@ -11,13 +11,15 @@ export interface Jeep {
   readonly position: Point;
   /** Heading in radians: 0 faces +z, π/2 faces +x (three.js's rotation.y convention). */
   readonly heading: number;
+  /** The heading the body is turning towards: the road ahead, or the last road driven once parked. */
+  readonly facing: number;
   readonly speed: number;
   /** Points still to drive through; empty when parked. */
   readonly route: readonly Point[];
 }
 
 export function parkedJeep(position: Point, heading = 0): Jeep {
-  return { position, heading, speed: 0, route: [] };
+  return { position, heading, facing: heading, speed: 0, route: [] };
 }
 
 /** Starts driving along `route`, keeping the current speed so a new tap doesn't jolt the jeep. */
@@ -40,8 +42,12 @@ export function angleBetween(a: number, b: number): number {
 
 /** Advances the jeep by `seconds`: accelerating, easing to a stop at the end of its route, and turning. */
 export function stepJeep(jeep: Jeep, seconds: number): Jeep {
-  if (jeep.route.length === 0 || seconds <= 0) {
-    return jeep.route.length === 0 ? { ...jeep, speed: 0 } : jeep;
+  if (seconds <= 0) {
+    return jeep;
+  }
+  if (jeep.route.length === 0) {
+    // Parked, but still finishing a turn that a short last stretch didn't leave time for.
+    return { ...jeep, heading: turnTowards(jeep.heading, jeep.facing, seconds), speed: 0 };
   }
 
   const remaining = routeLength([jeep.position, ...jeep.route]);
@@ -56,7 +62,7 @@ export function stepJeep(jeep: Jeep, seconds: number): Jeep {
 
   let position = jeep.position;
   let route = jeep.route;
-  let facing = jeep.heading;
+  let facing = jeep.facing;
   while (travel > 0 && route.length > 0) {
     const next = route[0] as Point;
     const gap = distance(position, next);
@@ -73,7 +79,17 @@ export function stepJeep(jeep: Jeep, seconds: number): Jeep {
     }
   }
 
+  return {
+    position,
+    heading: turnTowards(jeep.heading, facing, seconds),
+    facing,
+    speed: route.length === 0 ? 0 : speed,
+    route,
+  };
+}
+
+/** Turns from `heading` towards `target` by at most TURN_RATE for `seconds`. */
+function turnTowards(heading: number, target: number, seconds: number): number {
   const maxTurn = TURN_RATE * seconds;
-  const turn = Math.max(-maxTurn, Math.min(maxTurn, angleBetween(jeep.heading, facing)));
-  return { position, heading: jeep.heading + turn, speed: route.length === 0 ? 0 : speed, route };
+  return heading + Math.max(-maxTurn, Math.min(maxTurn, angleBetween(heading, target)));
 }
