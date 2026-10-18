@@ -170,10 +170,17 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     press = null;
   }
 
+  /** A press the browser took over (an edge swipe, palm rejection) goes nowhere. */
+  function onPointerCancel(event: PointerEvent): void {
+    if (press && event.pointerId === press.id) {
+      press = null;
+    }
+  }
+
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
-  canvas.addEventListener('pointercancel', onPointerUp);
+  canvas.addEventListener('pointercancel', onPointerCancel);
 
   // --- Frame loop. ------------------------------------------------------------------------------------
 
@@ -263,7 +270,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
-      canvas.removeEventListener('pointercancel', onPointerUp);
+      canvas.removeEventListener('pointercancel', onPointerCancel);
       scene.traverse((object) => {
         if (object instanceof THREE.Mesh) {
           object.geometry.dispose();
