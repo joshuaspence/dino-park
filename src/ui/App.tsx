@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-import { startScene, supportsWebGL2 } from '../render/scene';
+import { startGame } from '../render/game';
+import { supportsWebGL2 } from '../render/webgl';
 import { strings } from './strings';
 
 export function App() {
@@ -11,8 +12,8 @@ export function App() {
     if (!webgl2 || !canvasRef.current) {
       return;
     }
-    const scene = startScene(canvasRef.current);
-    return () => scene.dispose();
+    const game = startGame(canvasRef.current);
+    return () => game.dispose();
   }, [webgl2]);
 
   if (!webgl2) {

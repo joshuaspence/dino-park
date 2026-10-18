@@ -28,3 +28,19 @@ test('asks to be turned sideways in portrait', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByText('Turn me sideways!')).toBeVisible();
 });
+
+test('drives the jeep to where the player taps', async ({ page }) => {
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await expect(canvas).toHaveAttribute('data-moving', 'false');
+
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // Up and to the left of the jeep, which starts in the middle of the screen.
+  await canvas.click({ position: { x: box.width * 0.25, y: box.height * 0.3 } });
+  await expect(canvas).toHaveAttribute('data-moving', 'true');
+  await expect(canvas).toHaveAttribute('data-moving', 'false', { timeout: 20_000 });
+});

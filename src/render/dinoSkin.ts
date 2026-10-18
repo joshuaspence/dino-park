@@ -40,9 +40,10 @@ const FADE_SECONDS = 0.25;
 
 /**
  * The pack's models share one unit (roughly decimetres), so a single scale keeps the artist's relative
- * sizes: a T. rex comes out about 3.7 m long and a Triceratops about 2.6 m.
+ * sizes. Larger than life next to the jeep — a T. rex is about 7.7 m long, a Triceratops about 5.5 m —
+ * because big, readable dinosaurs matter more to small children than true scale.
  */
-const MODEL_SCALE = 0.12;
+const MODEL_SCALE = 0.25;
 
 /** Per-model adjustments on top of MODEL_SCALE: the pack's Parasaurolophus is too small to be Rosie. */
 const SCALE_ADJUSTMENTS: Record<string, number> = { parasaurolophus: 1.8 };
