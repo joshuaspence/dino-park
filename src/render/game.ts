@@ -144,6 +144,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     }
     canvas.setPointerCapture(event.pointerId);
     press = { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now(), holding: false };
+    // Plan on the first hold frame, so a press released just after it stops being a tap still drives the jeep.
+    sinceReplan = HOLD_REPLAN_SECONDS;
   }
 
   function onPointerMove(event: PointerEvent): void {

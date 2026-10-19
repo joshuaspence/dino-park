@@ -46,3 +46,24 @@ test('drives the jeep to where the player taps', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-moving', 'true');
   await expect(canvas).toHaveAttribute('data-moving', 'false', { timeout: 20_000 });
 });
+
+test('drives the jeep when a press is held just past a tap', async ({ page }) => {
+  // A fake clock steps the frame loop in even 16 ms frames, so how long the press lasts in game time doesn't
+  // depend on how fast the browser renders.
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // Longer than a tap but shorter than the hold replan interval: young children often press this long.
+  await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.3);
+  await page.mouse.down();
+  await page.clock.runFor(450);
+  await page.mouse.up();
+  await page.clock.runFor(100);
+  await expect(canvas).toHaveAttribute('data-moving', 'true');
+});
