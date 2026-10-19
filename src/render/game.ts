@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import { playDeliver, playHatch, playHonk, playLoad, playNeed, startEngine } from '../audio/effects';
 import type { Mixer } from '../audio/mixer';
+import { loadVoices } from '../audio/voices';
 import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
 import { resumeCare, savePark } from '../core/save';
@@ -487,10 +488,12 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     for (const event of step.events) {
       if (event.type === 'need') {
         playNeed(mixer);
+        voices.play(event.species, 'need');
       } else if (event.type === 'load') {
         playLoad(mixer);
       } else if (event.type === 'deliver') {
         playDeliver(mixer);
+        voices.play(event.species, 'helped');
         for (const dino of herds.get(event.species) ?? []) {
           dino.play('jump');
         }
@@ -670,6 +673,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
 
   const steering = startSteering(window, () => mixer.unlock());
   const engine = startEngine(mixer);
+  const voices = loadVoices(mixer);
   let sinceSteer = HOLD_REPLAN_SECONDS;
 
   return {

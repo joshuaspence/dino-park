@@ -40,7 +40,7 @@ export default defineConfig({
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,glb,ogg,m4a}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,glb,mp3}'],
       },
     }),
   ],
