@@ -163,3 +163,32 @@ test('saves a hatched egg and remembers it after a reload', async ({ page }) => 
   await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-eggs-hatched', '1');
 });
+
+test('honks, and the nearest dinosaur turns to look', async ({ page }) => {
+  // The look lasts seconds of game time, which CI's software rendering can stretch past any real-time wait, and
+  // past the default test timeout too.
+  test.slow();
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-looking', 'false');
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-looking', 'true');
+  // It looks for a few seconds, then goes back to what it was doing.
+  await playFor(page, 4000);
+  await expect(canvas).toHaveAttribute('data-looking', 'false');
+});
+
+test('honks from the keyboard too, as switch access and screen readers do', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await page.getByRole('button', { name: 'Honk' }).focus();
+  await page.keyboard.press('Enter');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-looking', 'true');
+});

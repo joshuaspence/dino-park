@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-import { type Jeep, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
+import { type Mixer, playHonk } from '../audio/mixer';
+import { type Jeep, angleBetween, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
 import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
@@ -13,6 +14,8 @@ import { loadPark, storePark } from '../storage/parkStore';
 import { buildPark } from './parkScene';
 
 export interface GameHandle {
+  /** Honks the jeep's horn, and the nearest dinosaur turns to look (docs/design.md §4). */
+  honk(): void;
   dispose(): void;
 }
 
@@ -49,6 +52,9 @@ const HATCHLING_SPEED = 8;
 const HATCHLING_SPACING = 2.5;
 /** How quickly an opening gate swings (per second; higher is snappier). */
 const GATE_SWING = 2;
+/** How long a dinosaur looks at the jeep after a honk, and how quickly it turns (per second). */
+const LOOK_SECONDS = 3;
+const LOOK_TURN = 6;
 
 function hatchlingSpot(index: number): Point {
   const angle = ((index % HATCHLING_SPOTS) / (HATCHLING_SPOTS - 1) - 0.5) * 2 * HATCHLING_ARC;
@@ -76,7 +82,7 @@ function snapToDestination(point: Point): Point {
 }
 
 /** Starts the park: the jeep, its route trail, the dinosaurs in their pens, and touch/mouse input. */
-export function startGame(canvas: HTMLCanvasElement): GameHandle {
+export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -350,6 +356,9 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     if (press) {
       return;
     }
+    // The first tap is the gesture browsers wait for before allowing sound: a mouse press counts, a finger's only on
+    // release, so `onPointerUp` unlocks too.
+    mixer.unlock();
     canvas.setPointerCapture(event.pointerId);
     press = { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now(), holding: false };
     // Plan on the first hold frame, so a press released just after it stops being a tap still drives the jeep.
@@ -368,6 +377,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   }
 
   function onPointerUp(event: PointerEvent): void {
+    mixer.unlock();
     if (!press || event.pointerId !== press.id) {
       return;
     }
@@ -540,6 +550,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     canvas.dataset.moving = String(jeep.route.length > 0);
     updateTrail();
     updateCare(delta);
+    updateLooking(delta);
 
     sun.position.set(jeep.position.x + 15, 30, jeep.position.z + 10);
     sun.target.position.set(jeep.position.x, 0, jeep.position.z);
@@ -551,7 +562,51 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     renderer.render(scene, camera);
   });
 
+  /** The dinosaur turning to look at the jeep, and the way it faced before. */
+  let looking: { dino: DinoInstance; facing: number; left: number } | null = null;
+
+  function updateLooking(delta: number): void {
+    canvas.dataset.looking = String(looking !== null && looking.left > 0);
+    if (!looking) {
+      return;
+    }
+    looking.left -= delta;
+    const { object } = looking.dino;
+    const towardsJeep = Math.atan2(jeep.position.x - object.position.x, jeep.position.z - object.position.z);
+    const target = looking.left > 0 ? towardsJeep : looking.facing;
+    object.rotation.y += angleBetween(object.rotation.y, target) * (1 - Math.exp(-LOOK_TURN * delta));
+    // Give it a second to turn back before letting go.
+    if (looking.left < -1) {
+      object.rotation.y = looking.facing;
+      looking = null;
+    }
+  }
+
   return {
+    honk() {
+      mixer.unlock();
+      playHonk(mixer);
+      // Rosie rides in the jeep, so only dinosaurs standing in the park itself can turn to look, and not hatchlings
+      // about to run to their pen, whose run sets their heading.
+      const walking = new Set(walks.flatMap((walk) => walk.herd));
+      let nearest: DinoInstance | null = null;
+      let nearestDistance = Infinity;
+      for (const dino of dinos) {
+        const { position, parent } = dino.object;
+        const away = distance({ x: position.x, z: position.z }, jeep.position);
+        if (parent === scene && !walking.has(dino) && away < nearestDistance) {
+          nearest = dino;
+          nearestDistance = away;
+        }
+      }
+      if (looking && looking.dino !== nearest) {
+        looking.dino.object.rotation.y = looking.facing;
+      }
+      if (nearest) {
+        const facing = looking?.dino === nearest ? looking.facing : nearest.object.rotation.y;
+        looking = { dino: nearest, facing, left: LOOK_SECONDS };
+      }
+    },
     dispose() {
       disposed = true;
       renderer.setAnimationLoop(null);

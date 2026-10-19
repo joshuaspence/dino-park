@@ -65,3 +65,28 @@ body,
   font-size: 0.7rem;
   opacity: 0.5;
 }
+
+/* Big and always within a small thumb's reach, bottom right in landscape. */
+.honk {
+  position: fixed;
+  right: max(1.5rem, env(safe-area-inset-right));
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  width: 6.5rem;
+  height: 6.5rem;
+  padding: 1rem;
+  border: 0.35rem solid #fff;
+  border-radius: 50%;
+  background: #4aa8e8;
+  box-shadow: 0 0.4rem 0 #2f7fc0;
+  touch-action: none;
+}
+
+.honk:active {
+  transform: translateY(0.3rem);
+  box-shadow: 0 0.1rem 0 #2f7fc0;
+}
+
+.honk svg {
+  width: 100%;
+  height: 100%;
+}
