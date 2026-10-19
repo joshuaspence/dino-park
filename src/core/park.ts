@@ -1,5 +1,5 @@
 import type { Point, RoadGraph } from './roads';
-import type { SpeciesId } from './species';
+import { type SpeciesId, speciesInPark } from './species';
 
 /** Where the jeep picks up each kind of supply (docs/design.md §3). */
 export type StationKind = 'hay' | 'meat' | 'fish' | 'water' | 'bath' | 'toys' | 'vet';
@@ -17,8 +17,19 @@ export interface Pen {
   readonly halfSize: Point;
 }
 
+/** A part of the park behind a gate, which opens once its species hatches (docs/design.md §5). */
+export interface Area {
+  readonly species: SpeciesId;
+  /** The road segments beyond the gate, joining nodes in the park's `roads.nodes`. */
+  readonly edges: readonly (readonly [string, string])[];
+  /** Where the gate stands across the road in. */
+  readonly gate: Point;
+}
+
 export interface Park {
+  /** The roads open from the start; each area's roads join them once it opens. */
   readonly roads: RoadGraph;
+  readonly areas: readonly Area[];
   readonly pens: readonly Pen[];
   readonly stations: readonly Station[];
   /** Where eggs wait to hatch, by the visitor centre. */
@@ -56,6 +67,7 @@ export const PARK: Park = {
       ['sw', { x: -36, z: 18 }],
       ['w', { x: -36, z: 0 }],
       ['centre', { x: 0, z: 0 }],
+      ['raptors', { x: 56, z: 0 }],
     ]),
     edges: [
       ['nw', 'nnw'],
@@ -79,7 +91,10 @@ export const PARK: Park = {
     { species: 'brontosaurus', position: { x: 18, z: -36 }, halfSize: { x: 9, z: 8 } },
     { species: 'stegosaurus', position: { x: -18, z: 34 }, halfSize: { x: 8, z: 6 } },
     { species: 'trex', position: { x: 18, z: 35 }, halfSize: { x: 9, z: 7 } },
+    { species: 'velociraptor', position: { x: 56, z: 12 }, halfSize: { x: 8, z: 6 } },
   ],
+  // East of the loop, so the closed gate and the empty pen behind it are in view from the bath.
+  areas: [{ species: 'velociraptor', edges: [['e', 'raptors']], gate: { x: 42, z: 0 } }],
   stations: [
     { kind: 'hay', position: { x: -8, z: -18 } },
     { kind: 'meat', position: { x: 8, z: -18 } },
@@ -97,4 +112,11 @@ export const PARK: Park = {
 export function penGate(pen: Pen): Point {
   const towardsCentre = pen.position.z < 0 ? 1 : -1;
   return { x: pen.position.x, z: pen.position.z + towardsCentre * pen.halfSize.z };
+}
+
+/** The roads the jeep can drive once `eggsHatched` eggs have hatched: the park's own, plus each open area's. */
+export function openRoads(park: Park, eggsHatched: number): RoadGraph {
+  const inPark = speciesInPark(eggsHatched);
+  const open = park.areas.filter((area) => inPark.includes(area.species));
+  return { nodes: park.roads.nodes, edges: [...park.roads.edges, ...open.flatMap((area) => area.edges)] };
 }

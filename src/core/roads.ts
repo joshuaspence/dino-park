@@ -141,3 +141,22 @@ export function routeLength(route: readonly Point[]): number {
   }
   return total;
 }
+
+/** The point `along` metres down `route`, clamped to its ends, and the heading of the leg it's on. */
+export function pointAlong(route: readonly Point[], along: number): { point: Point; heading: number } {
+  let left = Math.max(0, along);
+  let heading = 0;
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1] as Point;
+    const b = route[i] as Point;
+    const length = distance(a, b);
+    if (length > 0) {
+      heading = Math.atan2(b.x - a.x, b.z - a.z);
+    }
+    if (left <= length) {
+      return { point: length > 0 ? lerp(a, b, left / length) : a, heading };
+    }
+    left -= length;
+  }
+  return { point: route.at(-1) ?? { x: 0, z: 0 }, heading };
+}

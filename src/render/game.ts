@@ -2,9 +2,9 @@ import * as THREE from 'three';
 
 import { type Jeep, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
-import { PARK, penGate } from '../core/park';
-import { type Point, distance, findRoute, nearestRoadPosition } from '../core/roads';
-import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId } from '../core/species';
+import { PARK, type Pen, openRoads, penGate } from '../core/park';
+import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
+import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, speciesInPark } from '../core/species';
 import { type DinoInstance, loadDinoSkin } from './dinoSkin';
 import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
@@ -40,6 +40,13 @@ const SHELL_SECONDS = 1.2;
 const HATCHLING_SPOTS = 7;
 const HATCHLING_RING = 4.5;
 const HATCHLING_ARC = (2 * Math.PI) / 5;
+/** How long hatchlings with a pen of their own celebrate by the nest before running off to it. */
+const HATCH_CELEBRATION_SECONDS = 4;
+/** Hatchlings run to their pen along the roads in single file, this fast and this far apart. */
+const HATCHLING_SPEED = 8;
+const HATCHLING_SPACING = 2.5;
+/** How quickly an opening gate swings (per second; higher is snappier). */
+const GATE_SWING = 2;
 
 function hatchlingSpot(index: number): Point {
   const angle = ((index % HATCHLING_SPOTS) / (HATCHLING_SPOTS - 1) - 0.5) * 2 * HATCHLING_ARC;
@@ -165,8 +172,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     if (disposed) {
       return;
     }
-    // The hatchlings wait by the nest until their own area opens.
     const herdSize = species && model ? SPECIES[species].herdSize : 1;
+    const herd: DinoInstance[] = [];
     for (let i = 0; i < herdSize; i++) {
       const dino = skin.create();
       if (standIn) {
@@ -178,18 +185,75 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       scene.add(dino.object);
       dino.play('jump');
       dinos.push(dino);
+      herd.push(dino);
+    }
+    // A species with a pen runs there once it has celebrated, along the road the child will drive, so they see
+    // where it went; a stand-in baby stays by the nest.
+    const pen = species && model ? PARK.pens.find((candidate) => candidate.species === species) : undefined;
+    if (pen) {
+      const roads = openRoads(PARK, care.eggsHatched);
+      const road = findRoute(roads, nearestRoadPosition(roads, PARK.nest), nearestRoadPosition(roads, penGate(pen)));
+      const route = [...road, penGate(pen), pen.position];
+      const paths = herd.map((dino) => {
+        const spot = { x: dino.object.position.x, z: dino.object.position.z };
+        // Round the nest on the hatchling's own side, rather than straight through it to the road.
+        const side = spot.z < PARK.nest.z ? -1 : 1;
+        return [spot, { x: PARK.nest.x, z: PARK.nest.z + side * HATCHLING_RING }, ...route];
+      });
+      walks.push({ pen, herd, paths, wait: HATCH_CELEBRATION_SECONDS, travelled: 0 });
     }
   }
   let hatchlings = 0;
+  const walks: { pen: Pen; herd: DinoInstance[]; paths: Point[][]; wait: number; travelled: number }[] = [];
+
+  function stepWalks(delta: number): void {
+    for (const walk of walks) {
+      if (walk.wait > 0) {
+        walk.wait -= delta;
+        if (walk.wait <= 0) {
+          walk.herd.forEach((dino) => dino.play('run'));
+        }
+        continue;
+      }
+      walk.travelled += HATCHLING_SPEED * delta;
+      walk.herd.forEach((dino, i) => {
+        const along = walk.travelled - i * HATCHLING_SPACING;
+        const { point, heading } = pointAlong(walk.paths[i] ?? [], along);
+        dino.object.position.set(point.x, 0, point.z);
+        if (along > 0) {
+          dino.object.rotation.y = heading;
+        }
+      });
+    }
+    for (const walk of walks.filter((candidate) =>
+      candidate.paths.every((path, i) => candidate.travelled - i * HATCHLING_SPACING >= routeLength(path)),
+    )) {
+      moveIntoPen(walk.pen, walk.herd);
+      walk.herd.forEach((dino) => dino.play('idle'));
+      walks.splice(walks.indexOf(walk), 1);
+    }
+  }
+
+  function moveIntoPen(pen: Pen, herd: DinoInstance[]): void {
+    herd.forEach((dino, i) => {
+      dino.object.position.set(pen.position.x + (i - (herd.length - 1) / 2) * 2.5, 0, pen.position.z);
+      // Three-quarter view towards the camera, so each silhouette is easy to recognise.
+      dino.object.rotation.y = pen.position.x < 0 ? 0.7 : -0.7;
+    });
+    herds.set(pen.species, herd);
+  }
   let disposed = false;
 
   async function populate(): Promise<void> {
     const rosie = (await loadDinoSkin(ROSIE_MODEL)).create();
+    const inPark = speciesInPark(care.eggsHatched);
     const residents = await Promise.all(
-      PARK.pens.map(async (pen) => {
-        const model = SPECIES[pen.species].model;
-        return { pen, skin: model ? await loadDinoSkin(model) : null };
-      }),
+      PARK.pens
+        .filter((pen) => inPark.includes(pen.species))
+        .map(async (pen) => {
+          const model = SPECIES[pen.species].model;
+          return { pen, skin: model ? await loadDinoSkin(model) : null };
+        }),
     );
     if (disposed) {
       return;
@@ -204,18 +268,12 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       if (!skin) {
         continue;
       }
-      const herdSize = SPECIES[pen.species].herdSize;
-      const herd: DinoInstance[] = [];
-      herds.set(pen.species, herd);
-      for (let i = 0; i < herdSize; i++) {
-        const dino = skin.create();
-        dino.object.position.set(pen.position.x + (i - (herdSize - 1) / 2) * 2.5, 0, pen.position.z);
-        // Three-quarter view towards the camera, so each silhouette is easy to recognise.
-        dino.object.rotation.y = pen.position.x < 0 ? 0.7 : -0.7;
+      const herd = Array.from({ length: SPECIES[pen.species].herdSize }, () => skin.create());
+      for (const dino of herd) {
         scene.add(dino.object);
         dinos.push(dino);
-        herd.push(dino);
       }
+      moveIntoPen(pen, herd);
     }
     canvas.dataset.ready = 'true';
   }
@@ -235,9 +293,11 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   }
 
   function driveTowards(target: Point): void {
-    const from = nearestRoadPosition(PARK.roads, jeep.position);
-    const to = nearestRoadPosition(PARK.roads, target);
-    jeep = driveAlong(jeep, findRoute(PARK.roads, from, to));
+    // Plan on one graph throughout: road positions name edges by index.
+    const roads = openRoads(PARK, care.eggsHatched);
+    const from = nearestRoadPosition(roads, jeep.position);
+    const to = nearestRoadPosition(roads, target);
+    jeep = driveAlong(jeep, findRoute(roads, from, to));
   }
 
   let press: { id: number; x: number; y: number; at: number; holding: boolean } | null = null;
@@ -376,6 +436,19 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       scene.remove(shell.mesh);
       shell.mesh.geometry.dispose();
       shells.splice(shells.indexOf(shell), 1);
+    }
+
+    stepWalks(delta);
+
+    const inPark = speciesInPark(care.eggsHatched);
+    for (const area of PARK.areas) {
+      const open = inPark.includes(area.species);
+      park.getObjectByName(`gate-${area.species}`)?.traverse((part) => {
+        if (part.name === 'gate-leaf') {
+          const target = open ? (part.userData.side as number) * (Math.PI / 2) : 0;
+          part.rotation.y = THREE.MathUtils.damp(part.rotation.y, target, GATE_SWING, delta);
+        }
+      });
     }
 
     cargo.visible = care.cargo !== null;

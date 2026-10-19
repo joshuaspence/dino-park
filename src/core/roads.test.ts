@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { type RoadGraph, findRoute, nearestRoadPosition, routeLength } from './roads';
+import { type RoadGraph, findRoute, nearestRoadPosition, pointAlong, routeLength } from './roads';
 
 // A square loop with a spur:
 //
@@ -95,5 +95,23 @@ describe('findRoute', () => {
     const from = nearestRoadPosition(islands, { x: 0.5, z: 0 });
     const to = nearestRoadPosition(islands, { x: 5.5, z: 5 });
     expect(findRoute(islands, from, to)).toEqual([{ x: 0.5, z: 0 }]);
+  });
+});
+
+describe('pointAlong', () => {
+  const route = [
+    { x: 0, z: 0 },
+    { x: 10, z: 0 },
+    { x: 10, z: 10 },
+  ];
+
+  it('walks along each leg, facing the way it goes', () => {
+    expect(pointAlong(route, 4)).toEqual({ point: { x: 4, z: 0 }, heading: Math.PI / 2 });
+    expect(pointAlong(route, 15)).toEqual({ point: { x: 10, z: 5 }, heading: 0 });
+  });
+
+  it('stays at the ends before the start and past the finish', () => {
+    expect(pointAlong(route, -3).point).toEqual({ x: 0, z: 0 });
+    expect(pointAlong(route, 100)).toEqual({ point: { x: 10, z: 10 }, heading: 0 });
   });
 });
