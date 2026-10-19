@@ -281,6 +281,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
           }
         }
       });
+      trail.dispose();
       renderer.dispose();
     },
   };
