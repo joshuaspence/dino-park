@@ -90,3 +90,102 @@ body,
   width: 100%;
   height: 100%;
 }
+
+/* The grown-up gate: small, faded and out of the way, so it doesn't invite a child's tap. */
+.parent-gate {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  left: max(0.75rem, env(safe-area-inset-left));
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.6rem;
+  border: none;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.35);
+  color: rgb(31 59 42 / 0.6);
+  touch-action: none;
+}
+
+.parent-gate svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* A ring that fills over the three-second hold, so a grown-up can see it's working. */
+.parent-gate.holding {
+  background: conic-gradient(var(--ink) var(--held, 0%), rgb(255 255 255 / 0.6) 0);
+  animation: parent-hold 3s linear forwards;
+}
+
+@property --held {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+@keyframes parent-hold {
+  to {
+    --held: 100%;
+  }
+}
+
+.parent-panel {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(28rem, 90vw);
+  height: fit-content;
+  max-height: 90vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 0.5rem 2rem rgb(0 0 0 / 0.3);
+  font-size: 1.1rem;
+  touch-action: auto;
+  user-select: text;
+}
+
+.parent-panel h2,
+.parent-panel p {
+  margin: 0;
+}
+
+.parent-panel button {
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: var(--grass);
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.parent-numbers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.parent-numbers button {
+  font-size: 1.5rem;
+}
+
+.parent-volume {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.parent-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.parent-version {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}

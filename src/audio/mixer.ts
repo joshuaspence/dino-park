@@ -1,6 +1,6 @@
-/** The three audio buses from docs/design.md §6, each with its own volume for the parent area to set. */
-export type Bus = 'music' | 'effects' | 'voice';
+import type { Bus } from '../core/settings';
 
+/** The three audio buses from docs/design.md §6, each with its own volume for the parent area to set. */
 export interface Mixer {
   readonly context: AudioContext;
   readonly buses: Readonly<Record<Bus, GainNode>>;

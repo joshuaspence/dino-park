@@ -42,8 +42,13 @@ export function startSteering(target: Window, onGesture: () => void): Steering {
 
   function onKeyDown(event: KeyboardEvent): void {
     onGesture();
-    // A focused button already acts on Space and Enter, so leave those to it rather than honking twice.
-    if (event.target instanceof HTMLButtonElement && (event.code === 'Space' || event.code === 'Enter')) {
+    // A focused button already acts on Space and Enter, so leave those to it rather than honking twice, and keys in
+    // a dialog, such as the parent area's volume sliders, aren't meant for the jeep at all.
+    const element = event.target instanceof Element ? event.target : null;
+    if (element?.closest('[role="dialog"]') || element instanceof HTMLInputElement) {
+      return;
+    }
+    if (element instanceof HTMLButtonElement && (event.code === 'Space' || event.code === 'Enter')) {
       return;
     }
     if (event.code in KEYS) {
