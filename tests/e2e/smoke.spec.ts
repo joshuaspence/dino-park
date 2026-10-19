@@ -165,12 +165,17 @@ test('saves a hatched egg and remembers it after a reload', async ({ page }) => 
 });
 
 test('honks, and the nearest dinosaur turns to look', async ({ page }) => {
+  // The look lasts seconds of game time, which CI's software rendering can stretch past any real-time wait.
+  await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
   await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-looking', 'false');
   await page.getByRole('button', { name: 'Honk' }).click();
+  await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-looking', 'true');
   // It looks for a few seconds, then goes back to what it was doing.
-  await expect(canvas).toHaveAttribute('data-looking', 'false', { timeout: 10_000 });
+  await playFor(page, 4000);
+  await expect(canvas).toHaveAttribute('data-looking', 'false');
 });
