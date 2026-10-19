@@ -1,4 +1,4 @@
-import { type Page, expect, test } from '@playwright/test';
+import { type Page, type Request, expect, test } from '@playwright/test';
 
 import { strings } from '../../src/ui/strings';
 
@@ -656,8 +656,25 @@ test('plays offline once it has loaded', async ({ page, context }) => {
   });
 
   await context.setOffline(true);
+
+  // Only a model blocks `data-ready`; a sound that fails to load just logs a warning, so watch every request.
+  const pending = new Set<Request>();
+  const failed: string[] = [];
+  page.on('request', (request) => pending.add(request));
+  page.on('requestfinished', (request) => pending.delete(request));
+  page.on('requestfailed', (request) => {
+    pending.delete(request);
+    failed.push(new URL(request.url()).pathname);
+  });
+  const music = page.waitForRequest((request) => request.url().endsWith('/audio/music/park.mp3'));
   await page.reload();
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+
+  // Honking starts the music, so it loads in full rather than just what `preload` asks for.
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await music;
+  await expect.poll(() => pending.size).toBe(0);
+  expect(failed).toEqual([]);
   expect(errors).toEqual([]);
 });
