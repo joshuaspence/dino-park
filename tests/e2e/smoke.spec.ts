@@ -297,4 +297,26 @@ test('goes quiet while the page is hidden, and comes back with it', async ({ pag
   await expect.poll(state).toBe('suspended');
   await setHidden(false);
   await expect.poll(state).toBe('running');
+
+  // Hidden and back before the suspend settles: `state` still reads `running` at the show.
+  const settled = await page.evaluate(async () => {
+    const [context] = (window as unknown as { contexts: AudioContext[] }).contexts;
+    if (!context) throw new Error('The game made no audio context');
+    const pending: Promise<void>[] = [];
+    for (const method of ['suspend', 'resume'] as const) {
+      const original = context[method].bind(context);
+      context[method] = () => {
+        const promise = original();
+        pending.push(promise);
+        return promise;
+      };
+    }
+    for (const value of [true, false]) {
+      Object.defineProperty(document, 'hidden', { value, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+    await Promise.all(pending);
+    return context.state;
+  });
+  expect(settled).toBe('running');
 });

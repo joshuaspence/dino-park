@@ -29,11 +29,13 @@ export function createMixer(): Mixer {
   };
   // Hidden pages stop drawing frames but not Web Audio, so a continuous sound such as the engine would play on with
   // no game in view. Going quiet with the page covers every bus; coming back is allowed once there's been a gesture.
+  // Coming back skips `unlock`'s check: Firefox reads `running` until a suspend settles, so a quick hide and show would
+  // otherwise stay suspended.
   const onVisibility = () => {
     if (document.hidden) {
       void context.suspend();
     } else {
-      unlock();
+      void context.resume();
     }
   };
   document.addEventListener('visibilitychange', onVisibility);
