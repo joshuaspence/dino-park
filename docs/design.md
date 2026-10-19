@@ -132,8 +132,8 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   (parent area, settings) lives in string files, in **Australian English**.
 - **Ranger Rosie** is the mascot: a cheerful **Parasaurolophus** in a ranger hat who rides in the
   passenger seat. Her crest makes her silhouette unmistakable, and she honks through it. She speaks
-  short lines ("Trixie is hungry! Let's get some hay!"), runs the first-play tutorial ("Tap the
-  haystack!"), points at needs and cheers deliveries. She never takes control or blocks a tap.
+  short lines ("Trixie is hungry! Let's get some hay!"), runs the guided tour ("Tap the toy
+  shed!"), points at needs and cheers deliveries. She never takes control or blocks a tap.
   (Because Rosie is a Parasaurolophus, it is not in the unlock list.)
 - The **child is the driver**: a small helmeted figure in the jeep. Choosing the jeep colour is the
   only customisation (M3).
@@ -145,11 +145,23 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   (`en_GB-cori-high`, trained on public-domain LibriVox recordings): Piper has no Australian voice,
   and of the public-domain and CC0 ones, a British woman sounds closest. The game finds the
   recordings at build time and stays silent for any line without one.
-- **The first-play tutorial** lasts until the first need is met. Only **Steggy** wants anything,
-  and she's bored: Rosie says "Steggy is bored! Tap the toy shed!", a bobbing arrow points at the
-  toy shed, then at Steggy's gate once the toy is on the jeep, and Rosie cheers the delivery. Her
-  pen and the toy shed are both in view from where the jeep starts, so the child can see
-  everything the tutorial asks them to tap.
+- **The guided tour** walks a new player through one full round, and lasts until the first need is
+  met. Rosie says what to do one step at a time, a bobbing arrow points at what to tap, and the
+  camera shows each place while she names it:
+  1. "This is our jeep. Tap the road by the arrow, and we'll drive there!" The arrow is up the
+     middle road, and nobody wants anything until the child has driven.
+  2. Only **Steggy** wants anything, and she's bored. The camera shows her bubble ("Look! See the
+     bubble over Steggy? Steggy is bored!"), then the toy shed, with the arrow over it ("Let's get
+     a toy from the toy shed. Tap the toy shed!"). The wrong station gets "Oops, not that one!"
+     and the toy shed again.
+  3. "Got a toy! See it on the jeep? Now tap Steggy's pen!", showing her pen, with the arrow over
+     her gate.
+  4. "Hooray! You helped Steggy!", then, showing the nest, what the egg is for.
+
+  Tapping the arrow itself counts as tapping what it points at: it floats well above the ground,
+  so the ground under it is somewhere else, and that is where children tap. Her pen and the toy
+  shed are both near the start, so nothing the tour asks for is far away.
+
 - **Each dinosaur has its own voice** (roar, chirp, honk) for wanting something, being helped and
   sleeping, so children can hear who needs help.
 - **Gentle looping background music**, plus sound effects. Most effects (honk, engine, chimes,

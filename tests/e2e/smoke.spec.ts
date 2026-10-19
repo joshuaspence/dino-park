@@ -106,12 +106,28 @@ test('drives the jeep when a press is held just past a tap', async ({ page }) =>
   await expect(canvas).toHaveAttribute('data-moving', 'true');
 });
 
-test('a dinosaur asks for something soon after the park opens', async ({ page }) => {
+test('a dinosaur asks for something soon after a new player first drives', async ({ page }) => {
   await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   await expect(canvas).toHaveAttribute('data-needs', '');
+  // The guided tour teaches driving first, so nobody asks for anything until the jeep has moved.
+  await playFor(page, 6000);
+  await expect(canvas).toHaveAttribute('data-needs', '');
+  await page.keyboard.down('ArrowUp');
+  await playFor(page, 4000);
+  await page.keyboard.up('ArrowUp');
+  await expect(canvas).toHaveAttribute('data-needs', /^\w+:\w+$/);
+});
+
+test('a dinosaur asks for something soon after a returning player opens the park', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  await savedPark(page, { version: 1, needsMet: 1, eggsHatched: 0 });
+  await page.reload();
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
   await playFor(page, 4000);
   await expect(canvas).toHaveAttribute('data-needs', /^\w+:\w+$/);
 });
@@ -342,16 +358,20 @@ test('a dinosaur calls out when it wants something', async ({ page }) => {
       return source;
     };
   });
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  // Past the guided tour, so a need comes without driving first.
+  await savedPark(page, { version: 1, needsMet: 1, eggsHatched: 0 });
+
   const calls: string[] = [];
   page.on('response', (response) => {
     if (response.url().includes('/audio/dinos/') && response.ok()) {
       calls.push(response.url());
     }
   });
-
-  await page.clock.install();
-  await page.goto('./');
-  const canvas = page.locator('canvas.world');
+  await page.reload();
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   await expect.poll(() => calls.length).toBe(5);
   await playFor(page, 4000);
@@ -661,9 +681,23 @@ test('fades the music in even when its first play is refused', async ({ page }) 
   expect(await levelSoon()).toBeLessThan(0.35);
 });
 
-test('Rosie walks a new player through their first delivery', async ({ page }) => {
-  // It plays about 15 s of game time, which CI's software-rendered WebKit takes 70–90 s over.
+test('Rosie walks a new player through their first delivery, showing them each place', async ({ page }) => {
+  // It plays about 25 s of game time, which CI's software-rendered WebKit takes a couple of minutes over.
   test.slow();
+  // Every line Rosie says and every place the camera shows, in order.
+  await page.addInitScript(() => {
+    const said: string[] = [];
+    Object.assign(window, { said });
+    new MutationObserver((records) => {
+      for (const record of records) {
+        const { rosie } = (record.target as HTMLElement).dataset;
+        if (record.attributeName === 'data-rosie' && rosie) {
+          said.push(rosie);
+        }
+      }
+    }).observe(document, { attributes: true, attributeFilter: ['data-rosie'], subtree: true });
+  });
+  const said = () => page.evaluate(() => (window as unknown as { said: string[] }).said);
   await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
@@ -673,26 +707,51 @@ test('Rosie walks a new player through their first delivery', async ({ page }) =
     throw new Error('Canvas has no size');
   }
   const tap = (x: number, y: number) => canvas.click({ position: { x: box.width * x, y: box.height * y } });
+  /** Lets Rosie finish what she's saying, and the camera come back to the jeep, before the next tap. */
+  const listen = async () => {
+    await expect(canvas).toHaveAttribute('data-speaking', 'false', { timeout: 30_000 });
+    await playFor(page, 4000, async () => (await canvas.getAttribute('data-spotlight')) === 'false');
+    await expect(canvas).toHaveAttribute('data-spotlight', 'false');
+  };
 
-  // The first tap lets sound start, and Rosie says hello; then Steggy gets bored, and an arrow shows the toy shed.
+  // The first tap lets sound start. Rosie says hello and asks for a drive, with an arrow up the middle road; nobody
+  // wants anything yet.
   await page.getByRole('button', { name: 'Honk' }).click();
-  await playFor(page, 4000);
-  await expect(canvas).toHaveAttribute('data-needs', 'stegosaurus:bored');
-  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need');
-  await expect(canvas).toHaveAttribute('data-pointer', 'station');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.welcome rosie.tutorial.drive');
+  await expect(canvas).toHaveAttribute('data-pointer', 'drive');
+  await playFor(page, 5000);
+  await expect(canvas).toHaveAttribute('data-needs', '');
 
-  // The toy shed is just up and to the left of where the jeep starts.
-  await tap(0.36, 0.42);
-  await playFor(page, 6000);
+  // A tap on the arrow itself drives up the middle road to where it points. Soon Steggy gets bored: the camera shows
+  // her bubble, then the toy shed.
+  await tap(0.5, 0.2);
+  await playFor(page, 5000, async () => (await canvas.getAttribute('data-needs')) !== '');
+  await expect(canvas).toHaveAttribute('data-needs', 'stegosaurus:bored');
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need rosie.tutorial.station');
+  await expect(canvas).toHaveAttribute('data-pointer', 'station');
+  await expect(canvas).toHaveAttribute('data-spotlight', 'true');
+  await listen();
+
+  // The arrow is over the toy shed, down and to the left of the jeep now.
+  await tap(0.26, 0.58);
+  await playFor(page, 6000, async () => (await canvas.getAttribute('data-cargo')) === 'toys');
   await expect(canvas).toHaveAttribute('data-cargo', 'toys');
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.load');
   await expect(canvas).toHaveAttribute('data-pointer', 'pen');
+  await listen();
 
-  // Steggy's gate is along the road to the jeep's left.
+  // Steggy's gate is along the road to the jeep's left. The delivery is cheered, and the egg explained at the nest.
   await tap(0.31, 0.53);
-  await playFor(page, 5000);
-  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.done');
+  await playFor(page, 5000, async () => (await canvas.getAttribute('data-needs')) === '');
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.done rosie.tutorial.egg');
   await expect(canvas).toHaveAttribute('data-pointer', '');
+  expect(await said()).toEqual([
+    'rosie.welcome rosie.tutorial.drive',
+    'rosie.tutorial.need rosie.tutorial.station',
+    'rosie.tutorial.load',
+    'rosie.tutorial.done rosie.tutorial.egg',
+  ]);
 });
 
 test('Rosie holds what she has to say until sound starts', async ({ page }) => {
@@ -713,18 +772,22 @@ test('Rosie holds what she has to say until sound starts', async ({ page }) => {
   });
   await page.clock.install();
   await page.goto('./');
+  // Past the guided tour, so a dinosaur asks for something without the child driving first.
+  await savedPark(page, { version: 1, needsMet: 1, eggsHatched: 0 });
+  await page.reload();
   const canvas = page.locator('canvas.world');
   await expect(canvas).toHaveAttribute('data-ready', 'true');
 
-  // Steggy gets bored before the child's first tap, while the browser still keeps sound silent.
+  // A dinosaur wants something before the child's first tap, while the browser still keeps sound silent.
   await playFor(page, 4000);
-  await expect(canvas).toHaveAttribute('data-needs', 'stegosaurus:bored');
+  const need = (await canvas.getAttribute('data-needs')) ?? '';
+  expect(need).toMatch(/^\w+:\w+$/);
   await expect(canvas).not.toHaveAttribute('data-rosie');
 
   // Once it starts, Rosie says hello, and then what she held back.
   await page.getByRole('button', { name: 'Honk' }).click();
   await playFor(page, 200);
-  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need');
+  await expect(canvas).toHaveAttribute('data-rosie', `rosie.need.${need.replace(':', '.')}`);
 });
 
 test('plays offline once it has loaded', async ({ page, context }) => {

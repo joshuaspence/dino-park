@@ -7,15 +7,26 @@ import type { Mixer } from './mixer';
  */
 const CLIPS = import.meta.glob<string>('../assets/voice/*.mp3', { query: '?url', import: 'default', eager: true });
 
+/** A line for Rosie to say. `onStart` hears how long it lasts when she starts it, or 0 when it has no recording. */
+export interface Spoken {
+  readonly line: LineId;
+  readonly onStart?: (seconds: number) => void;
+}
+
 export interface RosieVoice {
-  /** Says `line` on the voice bus: now, or straight after what she's saying. Only the latest waiting line is kept. */
-  say(line: LineId): void;
+  /**
+   * Says `lines` in turn on the voice bus: now, or straight after the line she's saying. Lines given later replace
+   * any still waiting, so she never falls behind the game.
+   */
+  say(lines: readonly Spoken[]): void;
+  /** True while she has a line to say or is saying one. */
+  readonly speaking: boolean;
 }
 
 export function createRosieVoice(mixer: Mixer): RosieVoice {
   const decoded = new Map<string, Promise<AudioBuffer | null>>();
   let speaking = false;
-  let waiting: LineId | null = null;
+  let waiting: Spoken[] = [];
 
   function load(url: string): Promise<AudioBuffer | null> {
     let buffer = decoded.get(url);
@@ -33,22 +44,21 @@ export function createRosieVoice(mixer: Mixer): RosieVoice {
   }
 
   function next(): void {
-    const line = waiting;
-    waiting = null;
-    if (line) {
-      speak(line);
+    const spoken = waiting.shift();
+    if (!spoken) {
+      return;
     }
-  }
-
-  function speak(line: LineId): void {
-    const url = CLIPS[`../assets/voice/${line}.mp3`];
+    const url = CLIPS[`../assets/voice/${spoken.line}.mp3`];
     if (!url) {
+      spoken.onStart?.(0);
+      next();
       return;
     }
     speaking = true;
     void load(url).then((buffer) => {
       if (!buffer) {
         speaking = false;
+        spoken.onStart?.(0);
         next();
         return;
       }
@@ -60,16 +70,19 @@ export function createRosieVoice(mixer: Mixer): RosieVoice {
         next();
       };
       source.start();
+      spoken.onStart?.(buffer.duration);
     });
   }
 
   return {
-    say(line) {
-      if (speaking) {
-        waiting = line;
-      } else {
-        speak(line);
+    say(lines) {
+      waiting = [...lines];
+      if (!speaking) {
+        next();
       }
+    },
+    get speaking() {
+      return speaking || waiting.length > 0;
     },
   };
 }
