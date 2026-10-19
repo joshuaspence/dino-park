@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
-import { type Mixer, playHonk } from '../audio/mixer';
+import { playDeliver, playHatch, playHonk, playLoad, playNeed, startEngine } from '../audio/effects';
+import type { Mixer } from '../audio/mixer';
 import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
 import { resumeCare, savePark } from '../core/save';
@@ -484,7 +485,12 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
       void storePark(savePark(care));
     }
     for (const event of step.events) {
-      if (event.type === 'deliver') {
+      if (event.type === 'need') {
+        playNeed(mixer);
+      } else if (event.type === 'load') {
+        playLoad(mixer);
+      } else if (event.type === 'deliver') {
+        playDeliver(mixer);
         for (const dino of herds.get(event.species) ?? []) {
           dino.play('jump');
         }
@@ -493,6 +499,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
           spotlight = { point: pen.position, left: SPOTLIGHT_SECONDS };
         }
       } else if (event.type === 'hatch') {
+        playHatch(mixer);
         spotlight = { point: PARK.nest, left: SPOTLIGHT_SECONDS };
         // The shells take the full egg's size, so burst it before the next egg starts small.
         void hatch(care.eggsHatched - 1);
@@ -595,6 +602,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     }
 
     jeep = stepJeep(jeep, delta);
+    engine.setSpeed(jeep.speed / CRUISE_SPEED);
     jeepModel.position.set(jeep.position.x, 0, jeep.position.z);
     jeepModel.rotation.y = jeep.heading;
     for (const wheel of wheels) {
@@ -661,6 +669,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   }
 
   const steering = startSteering(window, () => mixer.unlock());
+  const engine = startEngine(mixer);
   let sinceSteer = HOLD_REPLAN_SECONDS;
 
   return {
@@ -668,6 +677,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     dispose() {
       disposed = true;
       steering.dispose();
+      engine.stop();
       renderer.setAnimationLoop(null);
       timer.dispose();
       observer.disconnect();

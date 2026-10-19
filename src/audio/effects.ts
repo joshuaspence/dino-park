@@ -1,0 +1,143 @@
+import type { Mixer } from './mixer';
+
+/**
+ * The game's sound effects, synthesised on the effects bus rather than recorded (docs/design.md §6): bright, short and
+ * soft enough to hear a hundred times.
+ */
+
+/** A toy car's "beep-beep": two short, bright notes, synthesised rather than recorded. */
+export function playHonk(mixer: Mixer): void {
+  const { context } = mixer;
+  const start = context.currentTime;
+  const tone = context.createBiquadFilter();
+  tone.type = 'lowpass';
+  tone.frequency.value = 2200;
+  tone.connect(mixer.buses.effects);
+  for (const beep of [0, 0.22]) {
+    const envelope = context.createGain();
+    envelope.gain.setValueAtTime(0, start + beep);
+    envelope.gain.linearRampToValueAtTime(0.25, start + beep + 0.02);
+    envelope.gain.setValueAtTime(0.25, start + beep + 0.14);
+    envelope.gain.linearRampToValueAtTime(0, start + beep + 0.18);
+    envelope.connect(tone);
+    // A major third apart, slightly detuned, for a friendly two-tone horn.
+    for (const frequency of [392, 494]) {
+      const oscillator = context.createOscillator();
+      oscillator.type = 'square';
+      oscillator.frequency.value = frequency;
+      oscillator.detune.value = frequency === 392 ? -6 : 6;
+      oscillator.connect(envelope);
+      oscillator.start(start + beep);
+      oscillator.stop(start + beep + 0.2);
+    }
+  }
+}
+
+/** One plucked or struck note: a quick attack, then an exponential fade. */
+function note(
+  mixer: Mixer,
+  frequency: number,
+  at: number,
+  length: number,
+  { type = 'sine', volume = 0.2 }: { type?: OscillatorType; volume?: number } = {},
+): void {
+  const { context } = mixer;
+  const envelope = context.createGain();
+  envelope.gain.setValueAtTime(0.0001, at);
+  envelope.gain.exponentialRampToValueAtTime(volume, at + 0.01);
+  envelope.gain.exponentialRampToValueAtTime(0.0001, at + length);
+  envelope.connect(mixer.buses.effects);
+  const oscillator = context.createOscillator();
+  oscillator.type = type;
+  oscillator.frequency.value = frequency;
+  oscillator.connect(envelope);
+  oscillator.start(at);
+  oscillator.stop(at + length + 0.05);
+}
+
+/** A soft, rising bubble pop as a need bubble appears. */
+export function playNeed(mixer: Mixer): void {
+  const { context } = mixer;
+  const at = context.currentTime;
+  const envelope = context.createGain();
+  envelope.gain.setValueAtTime(0.0001, at);
+  envelope.gain.exponentialRampToValueAtTime(0.15, at + 0.02);
+  envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.25);
+  envelope.connect(mixer.buses.effects);
+  const oscillator = context.createOscillator();
+  oscillator.frequency.setValueAtTime(420, at);
+  oscillator.frequency.exponentialRampToValueAtTime(900, at + 0.15);
+  oscillator.connect(envelope);
+  oscillator.start(at);
+  oscillator.stop(at + 0.3);
+}
+
+/** A two-note bell as something is loaded onto the jeep. */
+export function playLoad(mixer: Mixer): void {
+  const at = mixer.context.currentTime;
+  note(mixer, 1047, at, 0.6);
+  note(mixer, 1568, at + 0.12, 0.8);
+}
+
+/** A happy rising arpeggio as a dinosaur is helped. */
+export function playDeliver(mixer: Mixer): void {
+  const at = mixer.context.currentTime;
+  [523, 659, 784, 1047].forEach((frequency, i) => note(mixer, frequency, at + i * 0.09, 0.5, { type: 'triangle' }));
+}
+
+/** An eggshell crack, then a fanfare with a sparkle on top, for a hatch. */
+export function playHatch(mixer: Mixer): void {
+  const { context } = mixer;
+  const at = context.currentTime;
+  // The crack: a short burst of filtered noise.
+  const noise = context.createBuffer(1, Math.ceil(context.sampleRate * 0.12), context.sampleRate);
+  const samples = noise.getChannelData(0);
+  for (let i = 0; i < samples.length; i++) {
+    samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length);
+  }
+  const crack = context.createBufferSource();
+  crack.buffer = noise;
+  const band = context.createBiquadFilter();
+  band.type = 'bandpass';
+  band.frequency.value = 2500;
+  const crackGain = context.createGain();
+  crackGain.gain.value = 0.4;
+  crack.connect(band).connect(crackGain).connect(mixer.buses.effects);
+  crack.start(at);
+  [392, 523, 659, 784, 1047].forEach((frequency, i) =>
+    note(mixer, frequency, at + 0.25 + i * 0.1, 0.7, { type: 'triangle', volume: 0.22 }),
+  );
+  [2093, 2637, 3136].forEach((frequency, i) => note(mixer, frequency, at + 0.8 + i * 0.07, 0.4, { volume: 0.06 }));
+}
+
+/** A low, soft hum that follows the jeep's speed, silent when parked. */
+export interface Engine {
+  /** `fraction` of top speed, from 0 to 1. */
+  setSpeed(fraction: number): void;
+  stop(): void;
+}
+
+export function startEngine(mixer: Mixer): Engine {
+  const { context } = mixer;
+  const level = context.createGain();
+  level.gain.value = 0;
+  const tone = context.createBiquadFilter();
+  tone.type = 'lowpass';
+  tone.frequency.value = 400;
+  tone.connect(level).connect(mixer.buses.effects);
+  const oscillator = context.createOscillator();
+  oscillator.type = 'sawtooth';
+  oscillator.frequency.value = 55;
+  oscillator.connect(tone);
+  oscillator.start();
+  return {
+    setSpeed(fraction) {
+      const now = context.currentTime;
+      level.gain.setTargetAtTime(0.06 * fraction, now, 0.1);
+      oscillator.frequency.setTargetAtTime(55 + 35 * fraction, now, 0.1);
+    },
+    stop() {
+      oscillator.stop();
+    },
+  };
+}

@@ -232,3 +232,38 @@ test('draws the camera in on a hatch, then back to the jeep', async ({ page }) =
   await playFor(page, 3000);
   await expect(canvas).toHaveAttribute('data-spotlight', 'false');
 });
+
+test('chimes when something is loaded onto the jeep', async ({ page }) => {
+  // Record every oscillator the game makes, so the test can tell which sounds it played without hearing them.
+  await page.addInitScript(() => {
+    const oscillators: OscillatorNode[] = [];
+    Object.assign(window, { oscillators });
+    const create = AudioContext.prototype.createOscillator;
+    AudioContext.prototype.createOscillator = function (this: AudioContext) {
+      const oscillator = create.call(this);
+      oscillators.push(oscillator);
+      return oscillator;
+    };
+  });
+  const frequencies = () =>
+    page.evaluate(() =>
+      (window as unknown as { oscillators: OscillatorNode[] }).oscillators.map((node) => node.frequency.value),
+    );
+
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  expect(await frequencies()).not.toContain(1568);
+
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // The toy shed is just up and to the left of where the jeep starts.
+  await canvas.click({ position: { x: box.width * 0.36, y: box.height * 0.42 } });
+  await playFor(page, 6000);
+  await expect(canvas).toHaveAttribute('data-cargo', 'toys');
+  // The load chime's two bell notes.
+  expect(await frequencies()).toEqual(expect.arrayContaining([1047, 1568]));
+});
