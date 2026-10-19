@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { type Jeep, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
-import { type Point, distance, findRoute, nearestRoadPosition } from '../core/roads';
+import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
 import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, speciesInPark } from '../core/species';
 import { type DinoInstance, loadDinoSkin } from './dinoSkin';
 import { cargoIcon, iconMaterial, needIcon } from './icons';
@@ -40,8 +40,11 @@ const SHELL_SECONDS = 1.2;
 const HATCHLING_SPOTS = 7;
 const HATCHLING_RING = 4.5;
 const HATCHLING_ARC = (2 * Math.PI) / 5;
-/** How long hatchlings with a pen of their own celebrate by the nest before moving into it. */
+/** How long hatchlings with a pen of their own celebrate by the nest before running off to it. */
 const HATCH_CELEBRATION_SECONDS = 4;
+/** Hatchlings run to their pen along the roads in single file, this fast and this far apart. */
+const HATCHLING_SPEED = 8;
+const HATCHLING_SPACING = 2.5;
 /** How quickly an opening gate swings (per second; higher is snappier). */
 const GATE_SWING = 2;
 
@@ -184,14 +187,47 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       dinos.push(dino);
       herd.push(dino);
     }
-    // A species with a pen moves in once it has celebrated; a stand-in baby stays by the nest.
+    // A species with a pen runs there once it has celebrated, along the road the child will drive, so they see
+    // where it went; a stand-in baby stays by the nest.
     const pen = species && model ? PARK.pens.find((candidate) => candidate.species === species) : undefined;
     if (pen) {
-      moves.push({ pen, herd, after: HATCH_CELEBRATION_SECONDS });
+      const roads = openRoads(PARK, care.eggsHatched);
+      const road = findRoute(roads, nearestRoadPosition(roads, PARK.nest), nearestRoadPosition(roads, penGate(pen)));
+      const route = [...road, penGate(pen), pen.position];
+      const paths = herd.map((dino) => [{ x: dino.object.position.x, z: dino.object.position.z }, ...route]);
+      walks.push({ pen, herd, paths, wait: HATCH_CELEBRATION_SECONDS, travelled: 0 });
     }
   }
   let hatchlings = 0;
-  const moves: { pen: Pen; herd: DinoInstance[]; after: number }[] = [];
+  const walks: { pen: Pen; herd: DinoInstance[]; paths: Point[][]; wait: number; travelled: number }[] = [];
+
+  function stepWalks(delta: number): void {
+    for (const walk of walks) {
+      if (walk.wait > 0) {
+        walk.wait -= delta;
+        if (walk.wait <= 0) {
+          walk.herd.forEach((dino) => dino.play('run'));
+        }
+        continue;
+      }
+      walk.travelled += HATCHLING_SPEED * delta;
+      walk.herd.forEach((dino, i) => {
+        const along = walk.travelled - i * HATCHLING_SPACING;
+        const { point, heading } = pointAlong(walk.paths[i] ?? [], along);
+        dino.object.position.set(point.x, 0, point.z);
+        if (along > 0) {
+          dino.object.rotation.y = heading;
+        }
+      });
+    }
+    for (const walk of walks.filter((candidate) =>
+      candidate.paths.every((path, i) => candidate.travelled - i * HATCHLING_SPACING >= routeLength(path)),
+    )) {
+      moveIntoPen(walk.pen, walk.herd);
+      walk.herd.forEach((dino) => dino.play('idle'));
+      walks.splice(walks.indexOf(walk), 1);
+    }
+  }
 
   function moveIntoPen(pen: Pen, herd: DinoInstance[]): void {
     herd.forEach((dino, i) => {
@@ -397,13 +433,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       shells.splice(shells.indexOf(shell), 1);
     }
 
-    for (const move of moves) {
-      move.after -= delta;
-      if (move.after <= 0) {
-        moveIntoPen(move.pen, move.herd);
-      }
-    }
-    moves.splice(0, moves.length, ...moves.filter((move) => move.after > 0));
+    stepWalks(delta);
 
     const inPark = speciesInPark(care.eggsHatched);
     for (const area of PARK.areas) {

@@ -103,8 +103,9 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
 - Each unlock opens a **gate** to a new area of the map with its pen. The road beyond the gate and
   the empty pen are in view from the start, so there is something to look forward to; the jeep
   can't drive past a closed gate, and a dinosaur that hasn't hatched never wants anything. When the
-  egg hatches, the gate swings open and the hatchlings celebrate by the nest before moving into
-  their pen. The Velociraptors' area is east of the loop, beyond the bath.
+  egg hatches, the gate swings open and the hatchlings celebrate by the nest, then run along the
+  roads and through the gate into their pen, showing the child where the new area is. The
+  Velociraptors' area is east of the loop, beyond the bath.
 - **No currency and no shop.** The only progress is eggs → dinosaurs → new areas.
 - **Pacing:** about one egg per five needs met (roughly 5 minutes of play). The egg sits in a nest
   by the visitor centre, wobbles, and hatches with a big celebration. All launch-era unlocks take
