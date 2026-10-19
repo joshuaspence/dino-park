@@ -59,6 +59,14 @@ describe('PARK', () => {
     }
   });
 
+  it('visits nothing from the ends of the cross road, where the jeep starts', () => {
+    expect(PARK.start).toEqual(PARK.roads.nodes.get('s'));
+    for (const end of ['n', 's']) {
+      const node = PARK.roads.nodes.get(end);
+      expect(node && visitedPlace(PARK, node)).toBeUndefined();
+    }
+  });
+
   it('starts the jeep on a road', () => {
     expect(nearestRoadPosition(PARK.roads, PARK.start).distance).toBeCloseTo(0);
   });

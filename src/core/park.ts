@@ -25,8 +25,11 @@ export interface Park {
   readonly start: Point;
 }
 
-/** The farthest a pen or station's gate may be from the road it's reached by. */
-export const MAX_REACH = 12;
+/**
+ * The farthest a pen gate or station may be from the road it's reached by, and so how close the jeep must be to
+ * visit it. Water and bath sit right at this distance, 9 m from the loop.
+ */
+export const MAX_REACH = 9;
 
 /** How wide the tarmac is, in metres. */
 export const ROAD_WIDTH = 5;
