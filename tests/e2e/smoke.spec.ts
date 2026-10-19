@@ -483,21 +483,38 @@ test('resets the park from the parent area, after asking', async ({ page }) => {
   expect(await savedPark(page)).toEqual({ version: 1, needsMet: 0, eggsHatched: 0 });
 });
 
-test('plays the background music once sound starts', async ({ page }) => {
+test('plays the background music once sound starts, and again after the system pauses it', async ({ page }) => {
   // Record what the game asks to play, so the test can tell the music started without hearing it.
   await page.addInitScript(() => {
-    const played: string[] = [];
+    const played: HTMLMediaElement[] = [];
     Object.assign(window, { played });
     const play = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-      played.push(this.currentSrc || this.src);
+      played.push(this);
       return play.call(this);
     };
   });
+  const played = () =>
+    page.evaluate(() =>
+      (window as unknown as { played: HTMLMediaElement[] }).played.map((element) => ({
+        src: element.currentSrc || element.src,
+        paused: element.paused,
+      })),
+    );
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, 'hidden', { value, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+
   await page.goto('./');
   await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
   await page.getByRole('button', { name: 'Honk' }).click();
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { played: string[] }).played))
-    .toEqual([expect.stringContaining('/audio/music/park.mp3')]);
+  await expect.poll(played).toEqual([{ src: expect.stringContaining('/audio/music/park.mp3'), paused: false }]);
+
+  // iPadOS or Android's media notification can pause it from outside; coming back to the game starts it again.
+  await page.evaluate(() => (window as unknown as { played: HTMLMediaElement[] }).played[0]?.pause());
+  await setHidden(true);
+  await setHidden(false);
+  await expect.poll(async () => (await played()).map((element) => element.paused)).toEqual([false, false]);
 });
