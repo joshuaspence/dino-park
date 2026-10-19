@@ -67,3 +67,31 @@ test('drives the jeep when a press is held just past a tap', async ({ page }) =>
   await page.clock.runFor(100);
   await expect(canvas).toHaveAttribute('data-moving', 'true');
 });
+
+test('a dinosaur asks for something soon after the park opens', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await expect(canvas).toHaveAttribute('data-needs', '');
+  await page.clock.runFor(4000);
+  await expect(canvas).toHaveAttribute('data-needs', /^\w+:\w+$/);
+});
+
+test('loads the toy shed when the jeep stops there', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await expect(canvas).toHaveAttribute('data-cargo', '');
+
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // The toy shed is just up and to the left of where the jeep starts.
+  await canvas.click({ position: { x: box.width * 0.36, y: box.height * 0.42 } });
+  await page.clock.runFor(6000);
+  await expect(canvas).toHaveAttribute('data-moving', 'false');
+  await expect(canvas).toHaveAttribute('data-cargo', 'toys');
+});
