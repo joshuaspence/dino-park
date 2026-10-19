@@ -143,8 +143,8 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   `core/rosie.ts` from the dinosaurs' names, so a new species gets its lines without new text, and
   `scripts/generate-rosie.ts` records them with **Piper**, in **Cori**, a British English voice
   (`en_GB-cori-high`, trained on public-domain LibriVox recordings): Piper has no Australian voice,
-  and of the public-domain and CC0 ones, a British woman sounds closest. The game finds the recordings at build time and stays silent for any line
-  without one.
+  and of the public-domain and CC0 ones, a British woman sounds closest. The game finds the
+  recordings at build time and stays silent for any line without one.
 - **The first-play tutorial** lasts until the first need is met. Only **Steggy** wants anything,
   and she's bored: Rosie says "Steggy is bored! Tap the toy shed!", a bobbing arrow points at the
   toy shed, then at Steggy's gate once the toy is on the jeep, and Rosie cheers the delivery. Her
