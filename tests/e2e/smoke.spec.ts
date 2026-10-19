@@ -467,6 +467,9 @@ test('resets the park from the parent area, after asking', async ({ page }) => {
   await expect(page.getByRole('heading', { name: strings.parentTitle })).toHaveCount(0);
   await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-eggs-hatched', '1');
+  // ...and starts the cooldown, as a wrong number at the gate does.
+  await holdGate(page);
+  await expect(page.locator('#parent-ask')).toHaveCount(0);
 
   // Resetting takes its own named number.
   await page.clock.fastForward(30_000);
