@@ -2,10 +2,11 @@ import { type Page, expect, test } from '@playwright/test';
 
 /**
  * Plays `ms` of game time on a fake clock in 100 ms frames, the most the game steps in one frame. `runFor` would
- * render a frame every 16 ms, which CI's software rendering is far too slow for over several seconds.
+ * render a frame every 16 ms, which CI's software rendering is far too slow for over several seconds. With `until`, it
+ * stops as soon as that holds, so `ms` is the most game time to allow rather than all of it.
  */
-async function playFor(page: Page, ms: number): Promise<void> {
-  for (let played = 0; played < ms; played += 100) {
+async function playFor(page: Page, ms: number, until?: () => Promise<boolean>): Promise<void> {
+  for (let played = 0; played < ms && !(await until?.()); played += 100) {
     await page.clock.fastForward(100);
   }
 }
@@ -148,7 +149,7 @@ test('saves a hatched egg and remembers it after a reload', async ({ page }) => 
   }
   // The nest is up the cross road from where the jeep starts, just to its right.
   await canvas.click({ position: { x: box.width * 0.57, y: box.height * 0.2 } });
-  await playFor(page, 8000);
+  await playFor(page, 8000, async () => (await canvas.getAttribute('data-eggs-hatched')) === '1');
   await expect(canvas).toHaveAttribute('data-eggs-hatched', '1');
   await expect.poll(() => savedPark(page)).toEqual({ version: 1, needsMet: 5, eggsHatched: 1 });
 
