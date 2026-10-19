@@ -165,7 +165,9 @@ test('saves a hatched egg and remembers it after a reload', async ({ page }) => 
 });
 
 test('honks, and the nearest dinosaur turns to look', async ({ page }) => {
-  // The look lasts seconds of game time, which CI's software rendering can stretch past any real-time wait.
+  // The look lasts seconds of game time, which CI's software rendering can stretch past any real-time wait, and
+  // past the default test timeout too.
+  test.slow();
   await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
