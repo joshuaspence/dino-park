@@ -89,6 +89,24 @@ describe('stepNeeds', () => {
     expect(waiting()).toBe(MAX_NEEDS);
   });
 
+  it('waits a full interval after a need is met in a full park', () => {
+    let care = wait(startCare(PARK), 100);
+    expect(care.residents.filter((resident) => resident.need).length).toBe(MAX_NEEDS);
+    const helped = care.residents.findIndex((resident) => resident.need);
+    const resident = care.residents[helped];
+    const need = resident?.need;
+    if (!resident || !need) {
+      throw new Error('Nobody is waiting');
+    }
+    const cargo = supplyFor(need.kind, resident.species);
+    care = stepNeeds({ ...care, cargo }, PARK, atPen(resident.species), 0.1, first).care;
+    expect(care.needsMet).toBe(1);
+    care = wait(care, NEED_INTERVAL_SECONDS - 1);
+    expect(care.residents.filter((other) => other.need).length).toBe(MAX_NEEDS - 1);
+    care = wait(care, 1);
+    expect(care.residents.filter((other) => other.need).length).toBe(MAX_NEEDS);
+  });
+
   it('lets a need grow sad but never go away on its own', () => {
     let care = wait(startCare(PARK), FIRST_NEED_SECONDS);
     const sad = () => {

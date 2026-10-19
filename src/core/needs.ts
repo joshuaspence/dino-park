@@ -99,11 +99,12 @@ export function stepNeeds(
   }));
   let { cargo, needsMet } = care;
 
-  let untilNextNeed = care.untilNextNeed - seconds;
+  // While the park is full the countdown waits, so meeting a need brings a calm gap rather than a new demand.
+  const full = residents.filter((resident) => resident.need).length >= MAX_NEEDS;
+  let untilNextNeed = full ? NEED_INTERVAL_SECONDS : care.untilNextNeed - seconds;
   if (untilNextNeed <= 0) {
-    const waiting = residents.filter((resident) => resident.need).length;
     const calm = residents.filter((resident) => !resident.need && resident.happyFor === 0);
-    if (waiting < MAX_NEEDS && calm.length > 0) {
+    if (calm.length > 0) {
       const chosen = pick(calm, random);
       const kind = pick(NEED_KINDS, random);
       residents = residents.map((resident) =>
