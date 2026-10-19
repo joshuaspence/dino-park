@@ -22,12 +22,16 @@ export function parkedJeep(position: Point, heading = 0): Jeep {
   return { position, heading, facing: heading, speed: 0, route: [] };
 }
 
-/** Starts driving along `route`, keeping the current speed so a new tap doesn't jolt the jeep. */
+/**
+ * Starts driving along `route`. It keeps the current speed so a new tap doesn't jolt the jeep, unless the route
+ * doubles back: the body turns more slowly than the jeep moves, so it would slide backwards at full speed.
+ */
 export function driveAlong(jeep: Jeep, route: readonly Point[]): Jeep {
-  return {
-    ...jeep,
-    route: route.length > 0 && distance(route[0] as Point, jeep.position) < 1e-6 ? route.slice(1) : route,
-  };
+  const ahead = route.length > 0 && distance(route[0] as Point, jeep.position) < 1e-6 ? route.slice(1) : route;
+  const next = ahead[0];
+  const doublesBack =
+    next !== undefined && Math.abs(angleBetween(jeep.heading, headingTowards(jeep.position, next))) > Math.PI / 2;
+  return { ...jeep, speed: doublesBack ? 0 : jeep.speed, route: ahead };
 }
 
 export function headingTowards(from: Point, to: Point): number {
@@ -53,10 +57,12 @@ export function stepJeep(jeep: Jeep, seconds: number): Jeep {
   const remaining = routeLength([jeep.position, ...jeep.route]);
   // Fast as allowed, but never faster than lets us stop gently at the end: v² = 2·a·d.
   const target = Math.min(CRUISE_SPEED, Math.sqrt(2 * ACCELERATION * remaining));
+  // A new route can end closer than the jeep can stop at the usual rate, so brake as hard as the distance needs.
+  const braking = remaining > 0 ? Math.max(ACCELERATION, jeep.speed ** 2 / (2 * remaining)) : ACCELERATION;
   const speed =
     jeep.speed < target
       ? Math.min(target, jeep.speed + ACCELERATION * seconds)
-      : Math.max(target, jeep.speed - ACCELERATION * seconds);
+      : Math.max(target, jeep.speed - braking * seconds);
   // Always creep forward a little so the jeep can't stall just short of the end.
   let travel = Math.max(speed, 0.5) * seconds;
 

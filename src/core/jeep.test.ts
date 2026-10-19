@@ -97,11 +97,30 @@ describe('stepJeep', () => {
     expect(jeep.position).toEqual({ x: -0.5, z: 24 });
   });
 
-  it('keeps its speed when given a new route mid-drive', () => {
+  it('keeps its speed when given a new route ahead mid-drive', () => {
     let jeep = drive([{ x: 0, z: 30 }], 2).jeep;
     const speed = jeep.speed;
-    jeep = driveAlong(jeep, [jeep.position, { x: 0, z: 0 }]);
+    jeep = driveAlong(jeep, [jeep.position, { x: 5, z: 40 }]);
     expect(jeep.speed).toBe(speed);
+    expect(jeep.route).toEqual([{ x: 5, z: 40 }]);
+  });
+
+  it('stops before turning round when a new route doubles back', () => {
+    let jeep = drive([{ x: 0, z: 30 }], 2).jeep;
+    jeep = driveAlong(jeep, [jeep.position, { x: 0, z: 0 }]);
+    expect(jeep.speed).toBe(0);
     expect(jeep.route).toEqual([{ x: 0, z: 0 }]);
+  });
+
+  it('brakes smoothly when a new route ends closer than its usual stopping distance', () => {
+    let jeep = drive([{ x: 0, z: 100 }], 3).jeep;
+    expect(jeep.speed).toBe(CRUISE_SPEED);
+    jeep = driveAlong(jeep, [{ x: 0, z: jeep.position.z + 1 }]);
+    let lastSpeed = jeep.speed;
+    while (jeep.route.length > 0) {
+      jeep = stepJeep(jeep, STEP);
+      lastSpeed = jeep.route.length > 0 ? jeep.speed : lastSpeed;
+    }
+    expect(lastSpeed).toBeLessThan(1);
   });
 });
