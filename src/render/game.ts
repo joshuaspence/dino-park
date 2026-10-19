@@ -3,9 +3,21 @@ import * as THREE from 'three';
 import { playDeliver, playHatch, playHonk, playLoad, playNeed, startEngine } from '../audio/effects';
 import type { Mixer } from '../audio/mixer';
 import { startMusic } from '../audio/music';
+import { createRosieVoice } from '../audio/rosie';
 import { loadVoices } from '../audio/voices';
 import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
-import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
+import {
+  NEEDS_PER_EGG,
+  TUTORIAL_NEED,
+  eggProgress,
+  eggReady,
+  inTutorial,
+  isSad,
+  startCare,
+  stepNeeds,
+  supplyFor,
+} from '../core/needs';
+import { rosieSays, welcomeLine } from '../core/rosie';
 import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
@@ -54,6 +66,8 @@ const SAD_GROWTH = 1.4;
 const EGG_START_SIZE = 0.6;
 const EGG_FULL_SIZE = 1.5;
 const SHELL_SECONDS = 1.2;
+/** The tutorial's arrow floats this high over what to tap next, bobbing to catch the eye. */
+const ARROW_HEIGHT = 4.5;
 /** Hatchlings stand in an arc on the nest's far side from the cross road, wrapping round once it's full. */
 const HATCHLING_SPOTS = 7;
 const HATCHLING_RING = 4.5;
@@ -136,6 +150,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   let care = startCare(PARK);
   /** Needs wait for the saved park, so nothing happens on a fresh park that's about to be replaced. */
   let loaded = false;
+  /** Rosie says hello once, when the park has loaded and there's sound to hear her by. */
+  let welcomed = false;
+  /** Rosie herself, riding in the jeep, who hops when a dinosaur is helped. */
+  let rosieModel: DinoInstance | null = null;
   /** False when the stored park is from a newer version of the game, which this one mustn't overwrite. */
   let canSave = true;
   const bubbles = PARK.pens.map((pen) => {
@@ -318,6 +336,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     rosie.object.position.set(0, 1.3, -0.9);
     jeepModel.add(rosie.object);
     dinos.push(rosie);
+    rosieModel = rosie;
 
     for (const { pen, skin } of residents) {
       if (!skin) {
@@ -480,6 +499,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     if (!loaded) {
       return;
     }
+    if (!welcomed && mixer.running) {
+      welcomed = true;
+      say(welcomeLine(care));
+    }
     const step = stepNeeds(care, PARK, { position: jeep.position, parked: jeep.route.length === 0 }, delta);
     care = step.care;
     // Progress only changes on a delivery or a hatch, so that's when to save it.
@@ -487,6 +510,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
       void storePark(savePark(care));
     }
     for (const event of step.events) {
+      const line = rosieSays(event, care);
+      if (line) {
+        say(line);
+      }
       if (event.type === 'need') {
         playNeed(mixer);
         voices.play(event.species, 'need');
@@ -495,6 +522,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
       } else if (event.type === 'deliver') {
         playDeliver(mixer);
         voices.play(event.species, 'helped');
+        rosieModel?.play('jump');
         for (const dino of herds.get(event.species) ?? []) {
           dino.play('jump');
         }
@@ -566,6 +594,20 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
       .join(' ');
     canvas.dataset.cargo = care.cargo ?? '';
     canvas.dataset.eggsHatched = String(care.eggsHatched);
+
+    const tutee = care.residents.find((resident) => resident.species === TUTORIAL_NEED.species);
+    const pointAt =
+      inTutorial(care) && tutee?.need
+        ? care.cargo === tutorialSupply
+          ? tutorialPen && penGate(tutorialPen)
+          : tutorialStation?.position
+        : undefined;
+    arrow.visible = pointAt !== undefined;
+    if (pointAt) {
+      arrow.position.set(pointAt.x, ARROW_HEIGHT + Math.sin(timer.getElapsed() * 4) * 0.4, pointAt.z);
+      arrow.rotation.y += delta * 2;
+    }
+    canvas.dataset.pointer = !pointAt ? '' : care.cargo === tutorialSupply ? 'pen' : 'station';
   }
 
   const timer = new THREE.Timer();
@@ -675,6 +717,22 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   const steering = startSteering(window, () => mixer.unlock());
   const engine = startEngine(mixer);
   const voices = loadVoices(mixer);
+  const rosieVoice = createRosieVoice(mixer);
+  function say(line: string): void {
+    rosieVoice.say(line);
+    canvas.dataset.rosie = line;
+  }
+
+  // The first-play tutorial's arrow: over the station until its supply is on the jeep, then over the dinosaur's gate.
+  const arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.9, 2, 4).rotateX(Math.PI),
+    new THREE.MeshStandardMaterial({ color: 0xff8a1f, emissive: 0x803000, flatShading: true }),
+  );
+  arrow.visible = false;
+  scene.add(arrow);
+  const tutorialSupply = supplyFor(TUTORIAL_NEED.kind, TUTORIAL_NEED.species);
+  const tutorialStation = PARK.stations.find((station) => station.kind === tutorialSupply);
+  const tutorialPen = PARK.pens.find((pen) => pen.species === TUTORIAL_NEED.species);
   const music = startMusic(mixer);
   let sinceSteer = HOLD_REPLAN_SECONDS;
 

@@ -577,3 +577,35 @@ test('fades the music in even when its first play is refused', async ({ page }) 
   await expect.poll(levelSoon).toBeGreaterThan(0);
   expect(await levelSoon()).toBeLessThan(0.35);
 });
+
+test('Rosie walks a new player through their first delivery', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  const tap = (x: number, y: number) => canvas.click({ position: { x: box.width * x, y: box.height * y } });
+
+  // The first tap lets sound start, and Rosie says hello; then Steggy gets bored, and an arrow shows the toy shed.
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await playFor(page, 4000);
+  await expect(canvas).toHaveAttribute('data-needs', 'stegosaurus:bored');
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need');
+  await expect(canvas).toHaveAttribute('data-pointer', 'station');
+
+  // The toy shed is just up and to the left of where the jeep starts.
+  await tap(0.36, 0.42);
+  await playFor(page, 6000);
+  await expect(canvas).toHaveAttribute('data-cargo', 'toys');
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.load');
+  await expect(canvas).toHaveAttribute('data-pointer', 'pen');
+
+  // Steggy's gate is along the road to the jeep's left.
+  await tap(0.31, 0.53);
+  await playFor(page, 5000);
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.done');
+  await expect(canvas).toHaveAttribute('data-pointer', '');
+});
