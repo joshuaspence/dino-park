@@ -1,19 +1,27 @@
 import { useEffect, useRef } from 'react';
 
-import { startGame } from '../render/game';
+import { createMixer } from '../audio/mixer';
+import { type GameHandle, startGame } from '../render/game';
 import { supportsWebGL2 } from '../render/webgl';
 import { strings } from './strings';
 
 export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const gameRef = useRef<GameHandle | null>(null);
   const webgl2 = supportsWebGL2();
 
   useEffect(() => {
     if (!webgl2 || !canvasRef.current) {
       return;
     }
-    const game = startGame(canvasRef.current);
-    return () => game.dispose();
+    const mixer = createMixer();
+    const game = startGame(canvasRef.current, mixer);
+    gameRef.current = game;
+    return () => {
+      gameRef.current = null;
+      game.dispose();
+      mixer.dispose();
+    };
   }, [webgl2]);
 
   if (!webgl2) {
@@ -30,6 +38,13 @@ export function App() {
   return (
     <>
       <canvas ref={canvasRef} className="world" aria-label={strings.title} />
+      {/* On press rather than release, so a child who holds or slides their finger still hears it. */}
+      <button type="button" className="honk" aria-label={strings.honk} onPointerDown={() => gameRef.current?.honk()}>
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="16" cy="32" r="11" fill="#e0483e" />
+          <path d="M24 26 L52 12 Q58 32 52 52 L24 38 Z" fill="#ffd84a" stroke="#c9a227" strokeWidth="3" />
+        </svg>
+      </button>
       <div className="notice rotate-prompt" aria-live="polite">
         <span className="notice-picture" aria-hidden="true">
           📱↻
