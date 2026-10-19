@@ -28,6 +28,23 @@ export const TUTORIAL_NEED = { species: 'stegosaurus', kind: 'bored' } as const 
   kind: NeedKind;
 };
 
+/** How full each of a dinosaur's needs is, from 1 (full) to 0 (empty): its meters (docs/design.md §3). */
+export type Levels = Readonly<Record<NeedKind, number>>;
+
+/** A need only arises from a meter that has drained below this. */
+export const NEED_BELOW = 0.5;
+/**
+ * How long each meter takes to drain from full to empty while the park is calm. Food and water go quickest, a
+ * check-up at the vet slowest. Across the park this keeps a low meter ready about as often as a need comes.
+ */
+export const DRAIN_SECONDS: Readonly<Record<NeedKind, number>> = {
+  hungry: 600,
+  thirsty: 540,
+  dirty: 960,
+  bored: 720,
+  poorly: 1500,
+};
+
 export interface Need {
   readonly kind: NeedKind;
   /** Seconds the dinosaur has been waiting. */
@@ -36,6 +53,7 @@ export interface Need {
 
 export interface Resident {
   readonly species: SpeciesId;
+  readonly levels: Levels;
   readonly need: Need | null;
   /** Seconds of celebration left; 0 when calm. */
   readonly happyFor: number;
@@ -80,9 +98,25 @@ export function supplyFor(kind: NeedKind, species: SpeciesId): StationKind {
   }
 }
 
+/**
+ * A dinosaur's meters when the park opens: spread between nearly full and a little under half, differently for each
+ * pen, so someone has a need ready from the start.
+ */
+function startLevels(pen: number): Levels {
+  const levels = Object.fromEntries(
+    NEED_KINDS.map((kind, i) => [kind, 0.4 + 0.55 * (((pen * 3 + i * 7) % 10) / 9)]),
+  ) as Record<NeedKind, number>;
+  return levels;
+}
+
 export function startCare(park: Park): Care {
   return {
-    residents: park.pens.map((pen) => ({ species: pen.species, need: null, happyFor: 0 })),
+    residents: park.pens.map((pen, i) => ({
+      species: pen.species,
+      levels: startLevels(i),
+      need: null,
+      happyFor: 0,
+    })),
     untilNextNeed: FIRST_NEED_SECONDS,
     cargo: null,
     needsMet: 0,
@@ -112,43 +146,45 @@ export interface JeepAt {
  * only when the jeep stops at the nest, since the cross road runs past it and a hatch is the moment the child came
  * for.
  */
-export function stepNeeds(
-  care: Care,
-  park: Park,
-  jeep: JeepAt,
-  seconds: number,
-  random: () => number = Math.random,
-): { care: Care; events: CareEvent[] } {
+export function stepNeeds(care: Care, park: Park, jeep: JeepAt, seconds: number): { care: Care; events: CareEvent[] } {
   const events: CareEvent[] = [];
+  let { cargo, needsMet, eggsHatched } = care;
+  // While the park is full the countdown and the meters wait, so meeting a need brings a calm gap rather than a new
+  // demand. Until the first need is met, the first-play tutorial keeps it to one at a time.
+  const tutorial = inTutorial(care);
+  const full = care.residents.filter((resident) => resident.need).length >= (tutorial ? 1 : MAX_NEEDS);
+  // A dinosaur still waiting to hatch can't want anything yet, and its meters stay full.
+  const inPark = speciesInPark(eggsHatched);
   let residents = care.residents.map((resident) => ({
     ...resident,
+    levels: full || !inPark.includes(resident.species) ? resident.levels : drain(resident.levels, seconds),
     need: resident.need && { ...resident.need, age: resident.need.age + seconds },
     happyFor: Math.max(0, resident.happyFor - seconds),
   }));
-  let { cargo, needsMet, eggsHatched } = care;
 
-  // While the park is full the countdown waits, so meeting a need brings a calm gap rather than a new demand. Until the
-  // first need is met, the first-play tutorial keeps it to one at a time.
-  const tutorial = inTutorial(care);
-  const full = residents.filter((resident) => resident.need).length >= (tutorial ? 1 : MAX_NEEDS);
   let untilNextNeed = full ? NEED_INTERVAL_SECONDS : care.untilNextNeed - seconds;
   if (untilNextNeed <= 0) {
-    // A dinosaur still waiting to hatch can't want anything yet.
-    const inPark = speciesInPark(eggsHatched);
     const calm = residents.filter(
       (resident) => inPark.includes(resident.species) && !resident.need && resident.happyFor === 0,
     );
-    if (calm.length > 0) {
-      const tutee = tutorial ? calm.find((resident) => resident.species === TUTORIAL_NEED.species) : undefined;
-      const chosen = tutee ?? pick(calm, random);
-      const kind = tutee ? TUTORIAL_NEED.kind : pick(NEED_KINDS, random);
+    const tutee = tutorial ? calm.find((resident) => resident.species === TUTORIAL_NEED.species) : undefined;
+    // Whoever's lowest meter is lowest asks for it, once it's low enough to want.
+    const chosen = tutee
+      ? { resident: tutee, kind: TUTORIAL_NEED.kind }
+      : lowest(calm.map((resident) => ({ resident, kind: lowestKind(resident.levels) })));
+    if (chosen && (tutee || chosen.resident.levels[chosen.kind] < NEED_BELOW)) {
+      const { resident: asking, kind } = chosen;
+      // The tutorial's need comes whatever its meter says, so its meter drops to match.
+      const level = Math.min(asking.levels[kind], NEED_BELOW / 2);
       residents = residents.map((resident) =>
-        resident === chosen ? { ...resident, need: { kind, age: 0 } } : resident,
+        resident === asking
+          ? { ...resident, levels: { ...resident.levels, [kind]: level }, need: { kind, age: 0 } }
+          : resident,
       );
-      events.push({ type: 'need', species: chosen.species, kind });
+      events.push({ type: 'need', species: asking.species, kind });
       untilNextNeed = NEED_INTERVAL_SECONDS;
     } else {
-      // Try again as soon as a dinosaur is free.
+      // Try again as soon as a dinosaur is free, or a meter low enough.
       untilNextNeed = 0;
     }
   }
@@ -163,7 +199,9 @@ export function stepNeeds(
   if (helped && need && cargo === supplyFor(need.kind, helped.species)) {
     events.push({ type: 'deliver', species: helped.species, kind: need.kind });
     residents = residents.map((other) =>
-      other === helped ? { ...other, need: null, happyFor: HAPPY_SECONDS } : other,
+      other === helped
+        ? { ...other, levels: { ...other.levels, [need.kind]: 1 }, need: null, happyFor: HAPPY_SECONDS }
+        : other,
     );
     cargo = null;
     needsMet += 1;
@@ -222,6 +260,38 @@ export function isSad(need: Need): boolean {
   return need.age >= SAD_SECONDS;
 }
 
-function pick<T>(items: readonly T[], random: () => number): T {
-  return items[Math.min(items.length - 1, Math.floor(random() * items.length))] as T;
+/** Drains each meter for `seconds`, never below empty. */
+function drain(levels: Levels, seconds: number): Levels {
+  return Object.fromEntries(
+    NEED_KINDS.map((kind) => [kind, Math.max(0, levels[kind] - seconds / DRAIN_SECONDS[kind])]),
+  ) as Record<NeedKind, number>;
+}
+
+/** The emptiest of a dinosaur's meters, the first in NEED_KINDS order on a tie. */
+export function lowestKind(levels: Levels): NeedKind {
+  return NEED_KINDS.reduce((low, kind) => (levels[kind] < levels[low] ? kind : low));
+}
+
+/** The resident whose `kind` meter is emptiest, the first on a tie. */
+function lowest<T extends { resident: Resident; kind: NeedKind }>(choices: readonly T[]): T | undefined {
+  return choices.reduce<T | undefined>(
+    (low, choice) => (!low || choice.resident.levels[choice.kind] < low.resident.levels[low.kind] ? choice : low),
+    undefined,
+  );
+}
+
+/**
+ * How a dinosaur feels, for its info card: celebrating or with every meter well up is happy, wanting something is
+ * hopeful, and a long wait is sad. Otherwise it's fine.
+ */
+export type Mood = 'happy' | 'fine' | 'wants' | 'sad';
+
+export function moodOf(resident: Resident): Mood {
+  if (resident.happyFor > 0) {
+    return 'happy';
+  }
+  if (resident.need) {
+    return isSad(resident.need) ? 'sad' : 'wants';
+  }
+  return NEED_KINDS.every((kind) => resident.levels[kind] >= 0.6) ? 'happy' : 'fine';
 }
