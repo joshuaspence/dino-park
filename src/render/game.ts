@@ -36,6 +36,15 @@ const SAD_GROWTH = 1.4;
 const EGG_START_SIZE = 0.6;
 const EGG_FULL_SIZE = 1.5;
 const SHELL_SECONDS = 1.2;
+/** Hatchlings stand in an arc on the nest's far side from the cross road, wrapping round once it's full. */
+const HATCHLING_SPOTS = 7;
+const HATCHLING_RING = 4.5;
+const HATCHLING_ARC = (2 * Math.PI) / 5;
+
+function hatchlingSpot(index: number): Point {
+  const angle = ((index % HATCHLING_SPOTS) / (HATCHLING_SPOTS - 1) - 0.5) * 2 * HATCHLING_ARC;
+  return { x: PARK.nest.x + HATCHLING_RING * Math.cos(angle), z: PARK.nest.z + HATCHLING_RING * Math.sin(angle) };
+}
 
 /** The spots worth driving to: pen gates, stations and the nest. */
 const DESTINATIONS: Point[] = [
@@ -157,20 +166,21 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       return;
     }
     // The hatchlings wait by the nest until their own area opens.
-    const row = hatchlingRows++;
     const herdSize = species && model ? SPECIES[species].herdSize : 1;
     for (let i = 0; i < herdSize; i++) {
       const dino = skin.create();
       if (standIn) {
         dino.object.scale.multiplyScalar(0.5);
       }
-      dino.object.position.set(PARK.nest.x + 3 + i * 2, 0, PARK.nest.z + 3 + row * 2.5);
+      const spot = hatchlingSpot(hatchlings++);
+      dino.object.position.set(spot.x, 0, spot.z);
+      dino.object.rotation.y = Math.atan2(spot.x - PARK.nest.x, spot.z - PARK.nest.z);
       scene.add(dino.object);
       dino.play('jump');
       dinos.push(dino);
     }
   }
-  let hatchlingRows = 0;
+  let hatchlings = 0;
   let disposed = false;
 
   async function populate(): Promise<void> {
