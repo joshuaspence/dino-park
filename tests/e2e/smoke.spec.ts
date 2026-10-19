@@ -643,3 +643,21 @@ test('Rosie holds what she has to say until sound starts', async ({ page }) => {
   await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need');
 });
+
+test('plays offline once it has loaded', async ({ page, context }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  // The service worker is ready once it has installed, which is when it has precached every file.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+
+  await context.setOffline(true);
+  await page.reload();
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  expect(await page.evaluate(() => navigator.serviceWorker.controller !== null)).toBe(true);
+  expect(errors).toEqual([]);
+});
