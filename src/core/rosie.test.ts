@@ -57,6 +57,7 @@ describe('Ranger Rosie', () => {
     expect(rosieSays({ type: 'deliver', species: 'stegosaurus', kind: 'bored' }, { ...fresh, needsMet: 1 })).toEqual([
       { line: 'rosie.tutorial.done', focus: { pen: 'stegosaurus' } },
       { line: 'rosie.tutorial.egg', focus: { nest: true } },
+      { line: 'rosie.help.offer' },
     ]);
     const lines = rosieLines();
     expect(lines.get('rosie.tutorial.need')).toBe('Look! See the bubble over Steggy? Steggy is bored!');

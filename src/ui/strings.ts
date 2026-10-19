@@ -5,6 +5,8 @@ export const strings = {
   rotate: 'Turn me sideways!',
   /** Read aloud by screen readers only: the honk button itself is a picture. */
   honk: 'Honk',
+  /** Read aloud by screen readers only: the help button is Rosie's picture. */
+  help: 'Ask Ranger Rosie for help',
 
   // The parent area (docs/design.md §7). Reading is the gate: a small child can't tap a number named in words.
   gate: 'For grown-ups: press and hold',

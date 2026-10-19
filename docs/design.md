@@ -156,12 +156,22 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
      and the toy shed again.
   3. "Got a toy! See it on the jeep? Now tap Steggy's pen!", showing her pen, with the arrow over
      her gate.
-  4. "Hooray! You helped Steggy!", then, showing the nest, what the egg is for.
+  4. "Hooray! You helped Steggy!", then, showing the nest, what the egg is for, and that tapping
+     her picture gets help.
 
   Tapping the arrow itself counts as tapping what it points at: it floats well above the ground,
   so the ground under it is somewhere else, and that is where children tap. Her pen and the toy
   shed are both near the start, so nothing the tour asks for is far away.
 
+- **Help is Rosie's picture**, opposite the horn. Tapped, she says what to do next and the camera
+  shows the places she names: a ready egg first ("The egg's wobbling!"), then taking what's on the
+  jeep to whoever wants it ("Let's take it to Rex. Tap Rex's pen!"), then fetching for whoever has
+  waited longest ("Rex is hungry! Let's get some meat!", then "Tap the butcher!"). The arrow
+  points the way until the delivery or hatch, following the load from station to pen, and she
+  keeps to that job meanwhile: a new bubble and its dinosaur's call say someone else wants
+  something. With nothing to do she says everyone's happy. During the tour, help repeats the
+  current step. **Her picture wiggles when the child seems stuck**: 20 seconds without driving
+  (in the tour), loading, delivering or hatching while there's something to do.
 - **Each dinosaur has its own voice** (roar, chirp, honk) for wanting something, being helped and
   sleeping, so children can hear who needs help.
 - **Gentle looping background music**, plus sound effects. Most effects (honk, engine, chimes,
