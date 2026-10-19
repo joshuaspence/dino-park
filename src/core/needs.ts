@@ -100,8 +100,9 @@ export interface JeepAt {
 /**
  * Advances needs by `seconds` and handles the jeep's visits. A parked jeep loads from the nearest station in
  * reach; driving past one doesn't, so a trip back from the haystack can't swap its hay for water on the way. A
- * jeep near a pen delivers whenever its cargo is what that dinosaur needs, parked or not, and one at the nest
- * hatches the egg once it's ready.
+ * jeep near a pen delivers whenever its cargo is what that dinosaur needs, parked or not. A ready egg hatches
+ * only when the jeep stops at the nest, since the cross road runs past it and a hatch is the moment the child came
+ * for.
  */
 export function stepNeeds(
   care: Care,
@@ -152,7 +153,7 @@ export function stepNeeds(
     cargo = null;
     needsMet += 1;
   }
-  if (visiting && 'nest' in visiting && eggReady({ ...care, needsMet, eggsHatched })) {
+  if (visiting && 'nest' in visiting && jeep.parked && eggReady({ ...care, needsMet, eggsHatched })) {
     events.push({ type: 'hatch', species: UNLOCK_ORDER[eggsHatched] ?? null });
     eggsHatched += 1;
   }

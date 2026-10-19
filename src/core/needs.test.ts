@@ -168,7 +168,7 @@ describe('stepNeeds', () => {
 });
 
 describe('eggs', () => {
-  const atNest: JeepAt = { position: PARK.nest, parked: false };
+  const atNest: JeepAt = { position: nearestRoadPosition(PARK.roads, PARK.nest).point, parked: true };
 
   it('fills an egg one need at a time', () => {
     const care = startCare(PARK);
@@ -184,6 +184,11 @@ describe('eggs', () => {
     expect(events).toEqual([{ type: 'hatch', species: UNLOCK_ORDER[0] }]);
     expect(care.eggsHatched).toBe(1);
     expect(eggProgress(care)).toBe(0);
+  });
+
+  it("doesn't hatch when the jeep drives past the nest without stopping", () => {
+    const ready = { ...startCare(PARK), untilNextNeed: Infinity, needsMet: NEEDS_PER_EGG };
+    expect(stepNeeds(ready, PARK, { ...atNest, parked: false }, 0.1, first).events).toEqual([]);
   });
 
   it("doesn't hatch an egg that isn't ready", () => {
