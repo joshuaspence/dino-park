@@ -184,3 +184,25 @@ test('honks from the keyboard too, as switch access and screen readers do', asyn
   await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-looking', 'true');
 });
+
+test('drives with the arrow keys and honks with Space', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-moving', 'false');
+
+  // The jeep starts on the south road, which runs east–west, so holding right drives it along that road.
+  await page.keyboard.down('ArrowRight');
+  await playFor(page, 1000);
+  await expect(canvas).toHaveAttribute('data-moving', 'true');
+  await page.keyboard.up('ArrowRight');
+  // Letting go finishes the last short stretch and stops.
+  await playFor(page, 6000);
+  await expect(canvas).toHaveAttribute('data-moving', 'false');
+
+  await page.keyboard.press('Space');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-looking', 'true');
+});

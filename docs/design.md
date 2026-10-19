@@ -81,7 +81,9 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
 - **The jeep can't crash, fall off or get stuck.** Roads have soft edges and anything in the way
   moves aside.
 - **Honk button:** big and always available; the nearest dinosaur turns to look.
-- **Keyboard and gamepad** (arrows/WASD to steer and accelerate) as an extra, never required.
+- **Keyboard and gamepad** as an extra, never required. Arrows/WASD or the left stick/d-pad steer by
+  compass direction on screen, which the fixed camera keeps steady: the jeep drives along the roads
+  towards a point a little ahead that way, like a held finger. Space/H or the A button honks.
 - **Automatic follow camera:** third-person, above and behind the jeep, pulling back slightly while
   driving and zooming in on the dinosaur during a delivery. The child never controls the camera. It
   keeps **one compass direction** rather than swinging round behind the jeep at every turn, so a spot
