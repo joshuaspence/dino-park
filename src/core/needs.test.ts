@@ -155,6 +155,22 @@ describe('stepNeeds', () => {
     expect(care.residents.find((resident) => resident.species === 'trex')?.need?.kind).toBe('hungry');
   });
 
+  it('gives no needs to a dinosaur that has not hatched yet', () => {
+    // Always picks the last calm dinosaur, which is the locked pen's whenever it's allowed one.
+    const last = () => 0.999;
+    expect(PARK.pens.at(-1)?.species).toBe(PARK.areas[0]?.species);
+    const lockedNeed = (care: Care) => care.residents.at(-1)?.need ?? null;
+
+    let care = startCare(PARK);
+    for (let t = 0; t < 10 * NEED_INTERVAL_SECONDS; t++) {
+      care = stepNeeds(care, PARK, away, 1, last).care;
+    }
+    expect(lockedNeed(care)).toBeNull();
+
+    const hatched = stepNeeds({ ...startCare(PARK), eggsHatched: 1 }, PARK, away, FIRST_NEED_SECONDS, last).care;
+    expect(lockedNeed(hatched)).not.toBeNull();
+  });
+
   it("doesn't give a celebrating dinosaur a new need", () => {
     const start = startCare(PARK);
     const care: Care = {

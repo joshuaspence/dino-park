@@ -1,6 +1,6 @@
 import { MAX_REACH, type Park, type Pen, type Station, type StationKind, penGate } from './park';
 import { type Point, distance } from './roads';
-import { type Diet, SPECIES, type SpeciesId, UNLOCK_ORDER } from './species';
+import { type Diet, SPECIES, type SpeciesId, UNLOCK_ORDER, speciesInPark } from './species';
 
 /** What a dinosaur can want, each shown as a single picture in its bubble (docs/design.md §3). */
 export type NeedKind = 'hungry' | 'thirsty' | 'dirty' | 'bored' | 'poorly';
@@ -123,7 +123,11 @@ export function stepNeeds(
   const full = residents.filter((resident) => resident.need).length >= MAX_NEEDS;
   let untilNextNeed = full ? NEED_INTERVAL_SECONDS : care.untilNextNeed - seconds;
   if (untilNextNeed <= 0) {
-    const calm = residents.filter((resident) => !resident.need && resident.happyFor === 0);
+    // A dinosaur still waiting to hatch can't want anything yet.
+    const inPark = speciesInPark(eggsHatched);
+    const calm = residents.filter(
+      (resident) => inPark.includes(resident.species) && !resident.need && resident.happyFor === 0,
+    );
     if (calm.length > 0) {
       const chosen = pick(calm, random);
       const kind = pick(NEED_KINDS, random);
