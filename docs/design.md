@@ -51,6 +51,15 @@ score.**
 - Driving to a station **loads the item automatically** and it shows on the back of the jeep.
   Driving back to the pen **delivers it automatically**, and the dinosaur plays a joyful animation
   and sound (munching, splashing, a happy roar, a dance).
+- **A dinosaur has one need at a time, and at most two dinosaurs want something at once**, so a small
+  child never faces a screen of bubbles. The first need comes a few seconds into play; after that a
+  new one appears about every 25 seconds, never to a dinosaur that is still celebrating. While two
+  are waiting the count pauses, so meeting a need brings 25 calm seconds rather than a new demand.
+- **The jeep carries one thing at a time**: stopping at another station swaps it. It loads only when
+  it **stops** at a station, so the drive back can pass another station without swapping the load.
+  It delivers whenever it reaches the right pen, stopped or not, and a wrong item stays on the
+  jeep without fuss. Each station and pen gate has a road stop of its own: the nearest place to the
+  jeep is the one it's visiting.
 - Needs grow slowly and **never hurt the dinosaur**: an unmet need is a sad face and a bigger
   bubble. Nothing dies, gets ill from neglect or leaves.
 - Needs only advance **while the game is open**. There is no real-time clock: dinosaurs never go

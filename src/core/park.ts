@@ -2,7 +2,7 @@ import type { Point, RoadGraph } from './roads';
 import type { SpeciesId } from './species';
 
 /** Where the jeep picks up each kind of supply (docs/design.md §3). */
-export type StationKind = 'hay' | 'meat' | 'water' | 'bath' | 'toys' | 'vet';
+export type StationKind = 'hay' | 'meat' | 'fish' | 'water' | 'bath' | 'toys' | 'vet';
 
 export interface Station {
   readonly kind: StationKind;
@@ -25,8 +25,11 @@ export interface Park {
   readonly start: Point;
 }
 
-/** The farthest a pen or station's gate may be from the road it's reached by. */
-export const MAX_REACH = 12;
+/**
+ * How close the jeep must be to a pen gate or station to visit it. Each sits a couple of metres nearer its road
+ * than this, because hold-to-drive rarely stops exactly level with one.
+ */
+export const MAX_REACH = 9;
 
 /** How wide the tarmac is, in metres. */
 export const ROAD_WIDTH = 5;
@@ -76,12 +79,12 @@ export const PARK: Park = {
     { species: 'trex', position: { x: 18, z: 35 }, halfSize: { x: 9, z: 7 } },
   ],
   stations: [
-    { kind: 'hay', position: { x: -14, z: -16 } },
-    { kind: 'meat', position: { x: 14, z: -16 } },
-    { kind: 'water', position: { x: -27, z: 0 } },
-    { kind: 'bath', position: { x: 27, z: 0 } },
-    { kind: 'toys', position: { x: -14, z: 16 } },
-    { kind: 'vet', position: { x: 14, z: 16 } },
+    { kind: 'hay', position: { x: -8, z: -18 } },
+    { kind: 'meat', position: { x: 8, z: -18 } },
+    { kind: 'water', position: { x: -29, z: 0 } },
+    { kind: 'bath', position: { x: 29, z: 0 } },
+    { kind: 'toys', position: { x: -8, z: 18 } },
+    { kind: 'vet', position: { x: 8, z: 18 } },
   ],
   start: { x: 0, z: 24 },
 };
