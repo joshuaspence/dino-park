@@ -104,8 +104,6 @@ test('drives the jeep when a press is held just past a tap', async ({ page }) =>
 });
 
 test('a dinosaur asks for something soon after the park opens', async ({ page }) => {
-  // Loading plus seconds of frames takes over 25 s in CI's software rendering.
-  test.slow();
   await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
@@ -116,8 +114,6 @@ test('a dinosaur asks for something soon after the park opens', async ({ page })
 });
 
 test('loads the toy shed when the jeep stops there', async ({ page }) => {
-  // Loading plus seconds of frames takes over 25 s in CI's software rendering.
-  test.slow();
   await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
@@ -136,8 +132,6 @@ test('loads the toy shed when the jeep stops there', async ({ page }) => {
 });
 
 test('saves a hatched egg and remembers it after a reload', async ({ page }) => {
-  // Loading three times plus driving to the nest takes a while in CI's software rendering.
-  test.slow();
   await page.clock.install();
   await page.goto('./');
   // A park whose first egg is full, as if five needs had been met.
@@ -165,9 +159,7 @@ test('saves a hatched egg and remembers it after a reload', async ({ page }) => 
 });
 
 test('honks, and the nearest dinosaur turns to look', async ({ page }) => {
-  // The look lasts seconds of game time, which CI's software rendering can stretch past any real-time wait, and
-  // past the default test timeout too.
-  test.slow();
+  // The look lasts seconds of game time, which CI's software rendering can stretch past any real-time wait.
   await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
