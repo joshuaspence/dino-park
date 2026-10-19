@@ -267,3 +267,34 @@ test('chimes when something is loaded onto the jeep', async ({ page }) => {
   // The load chime's two bell notes.
   expect(await frequencies()).toEqual(expect.arrayContaining([1047, 1568]));
 });
+
+test('goes quiet while the page is hidden, and comes back with it', async ({ page }) => {
+  // Keep hold of the game's audio context, and let the test say whether the page is hidden.
+  await page.addInitScript(() => {
+    const contexts: AudioContext[] = [];
+    Object.assign(window, { contexts });
+    const Original = window.AudioContext;
+    window.AudioContext = class extends Original {
+      constructor(options?: AudioContextOptions) {
+        super(options);
+        contexts.push(this);
+      }
+    };
+  });
+  const state = () => page.evaluate(() => (window as unknown as { contexts: AudioContext[] }).contexts.at(-1)?.state);
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, 'hidden', { value, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+
+  await page.goto('./');
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await expect.poll(state).toBe('running');
+
+  await setHidden(true);
+  await expect.poll(state).toBe('suspended');
+  await setHidden(false);
+  await expect.poll(state).toBe('running');
+});

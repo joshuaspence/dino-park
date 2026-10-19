@@ -22,18 +22,30 @@ export function createMixer(): Mixer {
     return gain;
   };
   const buses = { music: bus(), effects: bus(), voice: bus() };
+  const unlock = () => {
+    if (context.state === 'suspended') {
+      void context.resume();
+    }
+  };
+  // Hidden pages stop drawing frames but not Web Audio, so a continuous sound such as the engine would play on with
+  // no game in view. Going quiet with the page covers every bus; coming back is allowed once there's been a gesture.
+  const onVisibility = () => {
+    if (document.hidden) {
+      void context.suspend();
+    } else {
+      unlock();
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
   return {
     context,
     buses,
     get running() {
       return context.state === 'running';
     },
-    unlock() {
-      if (context.state === 'suspended') {
-        void context.resume();
-      }
-    },
+    unlock,
     dispose() {
+      document.removeEventListener('visibilitychange', onVisibility);
       void context.close();
     },
   };
