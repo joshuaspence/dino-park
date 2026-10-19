@@ -19,3 +19,16 @@ animations and compresses the meshes. The game recolours the models at load time
 | `trex.glb`            | Rex the T. rex         |
 | `velociraptor.glb`    | the Raptors            |
 | `parasaurolophus.glb` | Ranger Rosie           |
+
+## Sounds
+
+Every other sound in the game is synthesised in code (`src/audio/effects.ts`). The dinosaurs' calls are
+[Freesound](https://freesound.org)'s public HQ MP3 previews, fetched by `scripts/import-dino-voices.mjs`.
+
+| File                                  | Used as           | Source                                                                            | Author                                                 | Licence                                                       |
+| ------------------------------------- | ----------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
+| `public/audio/dinos/trex.mp3`         | Rex's call        | [Dinosaur 2.wav](https://freesound.org/people/JarredGibb/sounds/233277/)          | [JarredGibb](https://freesound.org/people/JarredGibb/) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `public/audio/dinos/stegosaurus.mp3`  | Steggy's call     | [Dinosaur 4.wav](https://freesound.org/people/JarredGibb/sounds/233279/)          | [JarredGibb](https://freesound.org/people/JarredGibb/) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `public/audio/dinos/brontosaurus.mp3` | Bruno's call      | [Elephant Trumpets Growls](https://freesound.org/people/D.jones/sounds/527845/)   | [D.jones](https://freesound.org/people/D.jones/)       | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `public/audio/dinos/triceratops.mp3`  | Trixie's call     | [Pig - Multiple Snorts 2](https://freesound.org/people/JarredGibb/sounds/233183/) | [JarredGibb](https://freesound.org/people/JarredGibb/) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `public/audio/dinos/velociraptor.mp3` | the Raptors' call | [Penguin Squeak](https://freesound.org/people/Breviceps/sounds/705839/)           | [Breviceps](https://freesound.org/people/Breviceps/)   | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |

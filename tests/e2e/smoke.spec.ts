@@ -320,3 +320,38 @@ test('goes quiet while the page is hidden, and comes back with it', async ({ pag
   });
   expect(settled).toBe('running');
 });
+
+test('a dinosaur calls out when it wants something', async ({ page }) => {
+  // Record each recorded sound the game starts, so the test can tell a call played without hearing it.
+  await page.addInitScript(() => {
+    const started: number[] = [];
+    Object.assign(window, { started });
+    const create = AudioContext.prototype.createBufferSource;
+    AudioContext.prototype.createBufferSource = function (this: AudioContext) {
+      const source = create.call(this);
+      const start = source.start.bind(source);
+      source.start = (...args: Parameters<AudioBufferSourceNode['start']>) => {
+        started.push(source.buffer?.duration ?? 0);
+        start(...args);
+      };
+      return source;
+    };
+  });
+  const calls: string[] = [];
+  page.on('response', (response) => {
+    if (response.url().includes('/audio/dinos/') && response.ok()) {
+      calls.push(response.url());
+    }
+  });
+
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await expect.poll(() => calls.length).toBe(5);
+  await playFor(page, 4000);
+  await expect(canvas).toHaveAttribute('data-needs', /^\w+:\w+$/);
+  // The call is a decoded recording, which the synthesised need pop isn't.
+  const started = await page.evaluate(() => (window as unknown as { started: number[] }).started);
+  expect(started.some((seconds) => seconds > 0.3)).toBe(true);
+});
