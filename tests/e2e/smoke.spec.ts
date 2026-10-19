@@ -79,6 +79,8 @@ test('drives the jeep when a press is held just past a tap', async ({ page }) =>
 });
 
 test('a dinosaur asks for something soon after the park opens', async ({ page }) => {
+  // Loading plus seconds of frames takes over 25 s in CI's software rendering.
+  test.slow();
   await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
@@ -89,6 +91,8 @@ test('a dinosaur asks for something soon after the park opens', async ({ page })
 });
 
 test('loads the toy shed when the jeep stops there', async ({ page }) => {
+  // Loading plus seconds of frames takes over 25 s in CI's software rendering.
+  test.slow();
   await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
