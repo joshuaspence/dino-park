@@ -194,7 +194,12 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       const roads = openRoads(PARK, care.eggsHatched);
       const road = findRoute(roads, nearestRoadPosition(roads, PARK.nest), nearestRoadPosition(roads, penGate(pen)));
       const route = [...road, penGate(pen), pen.position];
-      const paths = herd.map((dino) => [{ x: dino.object.position.x, z: dino.object.position.z }, ...route]);
+      const paths = herd.map((dino) => {
+        const spot = { x: dino.object.position.x, z: dino.object.position.z };
+        // Round the nest on the hatchling's own side, rather than straight through it to the road.
+        const side = spot.z < PARK.nest.z ? -1 : 1;
+        return [spot, { x: PARK.nest.x, z: PARK.nest.z + side * HATCHLING_RING }, ...route];
+      });
       walks.push({ pen, herd, paths, wait: HATCH_CELEBRATION_SECONDS, travelled: 0 });
     }
   }
