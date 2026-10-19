@@ -76,12 +76,12 @@ export const PARK: Park = {
     { species: 'trex', position: { x: 18, z: 35 }, halfSize: { x: 9, z: 7 } },
   ],
   stations: [
-    { kind: 'hay', position: { x: -14, z: -16 } },
-    { kind: 'meat', position: { x: 14, z: -16 } },
+    { kind: 'hay', position: { x: -8, z: -18 } },
+    { kind: 'meat', position: { x: 8, z: -18 } },
     { kind: 'water', position: { x: -27, z: 0 } },
     { kind: 'bath', position: { x: 27, z: 0 } },
-    { kind: 'toys', position: { x: -14, z: 16 } },
-    { kind: 'vet', position: { x: 14, z: 16 } },
+    { kind: 'toys', position: { x: -8, z: 18 } },
+    { kind: 'vet', position: { x: 8, z: 18 } },
   ],
   start: { x: 0, z: 24 },
 };
