@@ -483,3 +483,97 @@ test('resets the park from the parent area, after asking', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-eggs-hatched', '0');
   expect(await savedPark(page)).toEqual({ version: 1, needsMet: 0, eggsHatched: 0 });
 });
+
+test('plays the background music once sound starts, and again after the system pauses it', async ({ page }) => {
+  // Record what the game asks to play, so the test can tell the music started without hearing it.
+  await page.addInitScript(() => {
+    const played: HTMLMediaElement[] = [];
+    Object.assign(window, { played });
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      played.push(this);
+      return play.call(this);
+    };
+  });
+  const played = () =>
+    page.evaluate(() =>
+      (window as unknown as { played: HTMLMediaElement[] }).played.map((element) => ({
+        src: element.currentSrc || element.src,
+        paused: element.paused,
+      })),
+    );
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, 'hidden', { value, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+
+  await page.goto('./');
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await expect.poll(played).toEqual([{ src: expect.stringContaining('/audio/music/park.mp3'), paused: false }]);
+
+  // iPadOS or Android's media notification can pause it from outside; coming back to the game starts it again.
+  await page.evaluate(() => (window as unknown as { played: HTMLMediaElement[] }).played[0]?.pause());
+  await setHidden(true);
+  await setHidden(false);
+  await expect.poll(async () => (await played()).map((element) => element.paused)).toEqual([false, false]);
+});
+
+test('fades the music in even when its first play is refused', async ({ page }) => {
+  // Refuse the first play, as a browser does before a gesture, and keep the music's own gain: the one its
+  // media-element source connects to.
+  await page.addInitScript(() => {
+    const music: { level?: GainNode } = {};
+    Object.assign(window, { music });
+    const play = HTMLMediaElement.prototype.play;
+    let refused = false;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      if (!refused) {
+        refused = true;
+        return Promise.reject(new DOMException('Refused by the test', 'NotAllowedError'));
+      }
+      return play.call(this);
+    };
+    const createSource = AudioContext.prototype.createMediaElementSource;
+    AudioContext.prototype.createMediaElementSource = function (this: AudioContext, element: HTMLMediaElement) {
+      const source = createSource.call(this, element);
+      const connect = source.connect.bind(source) as (destination: AudioNode) => AudioNode;
+      source.connect = ((destination: AudioNode) => {
+        music.level = destination as GainNode;
+        return connect(destination);
+      }) as typeof source.connect;
+      return source;
+    };
+  });
+
+  // The music's level after a fifth of a second of audio time, long enough for a started fade to be heard.
+  const levelSoon = () =>
+    page.evaluate(async () => {
+      const { level } = (window as unknown as { music: { level?: GainNode } }).music;
+      if (!level) {
+        throw new Error('The music has no gain');
+      }
+      const until = level.context.currentTime + 0.2;
+      while (level.context.currentTime < until) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      return level.gain.value;
+    });
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, 'hidden', { value, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+
+  await page.goto('./');
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await page.getByRole('button', { name: 'Honk' }).click();
+  expect(await levelSoon()).toBe(0);
+
+  // The retry when sound next starts plays it, and only then does it fade in.
+  await setHidden(true);
+  await setHidden(false);
+  await expect.poll(levelSoon).toBeGreaterThan(0);
+  expect(await levelSoon()).toBeLessThan(0.35);
+});

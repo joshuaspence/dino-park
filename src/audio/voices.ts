@@ -3,7 +3,7 @@ import type { Mixer } from './mixer';
 
 /**
  * Each dinosaur's own call (docs/design.md §6), so a child can hear who needs help. One recording per species
- * (scripts/import-dino-voices.mjs) serves every moment, played faster and higher when the dinosaur is pleased.
+ * (scripts/import-sounds.mjs) serves every moment, played faster and higher when the dinosaur is pleased.
  */
 export type Moment = 'need' | 'helped';
 
