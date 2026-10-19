@@ -175,7 +175,7 @@ export function stepNeeds(care: Care, park: Park, jeep: JeepAt, seconds: number)
     if (chosen && (tutee || chosen.resident.levels[chosen.kind] < NEED_BELOW)) {
       const { resident: asking, kind } = chosen;
       // The tutorial's need comes whatever its meter says, so its meter drops to match.
-      const level = Math.min(asking.levels[kind], NEED_BELOW / 2);
+      const level = tutee ? Math.min(asking.levels[kind], NEED_BELOW / 2) : asking.levels[kind];
       residents = residents.map((resident) =>
         resident === asking
           ? { ...resident, levels: { ...resident.levels, [kind]: level }, need: { kind, age: 0 } }

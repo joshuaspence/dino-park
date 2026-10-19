@@ -243,6 +243,10 @@ describe('stepNeeds', () => {
     const { care: next, events } = stepNeeds(care, PARK, away, 0.02 * DRAIN_SECONDS.thirsty);
     expect(events).toEqual([{ type: 'need', species: 'trex', kind: 'thirsty' }]);
     expect(lowestKind(next.residents.find((resident) => resident.species === 'trex')?.levels ?? FULL)).toBe('thirsty');
+    // The bubble appears without the meter jumping: it carries on draining from where it was.
+    expect(next.residents.find((resident) => resident.species === 'trex')?.levels.thirsty).toBeCloseTo(
+      NEED_BELOW - 0.01,
+    );
   });
 
   it('drains every meter while the park is calm, and holds them while it is full', () => {
