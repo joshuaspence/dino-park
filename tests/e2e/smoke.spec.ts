@@ -179,3 +179,14 @@ test('honks, and the nearest dinosaur turns to look', async ({ page }) => {
   await playFor(page, 4000);
   await expect(canvas).toHaveAttribute('data-looking', 'false');
 });
+
+test('honks from the keyboard too, as switch access and screen readers do', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await page.getByRole('button', { name: 'Honk' }).focus();
+  await page.keyboard.press('Enter');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-looking', 'true');
+});

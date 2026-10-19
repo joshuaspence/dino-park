@@ -65,6 +65,14 @@ export function App() {
           }
           honked.current = true;
         }}
+        // Enter, Space, switch access and a screen reader's "activate" send only a click, with `detail` 0; a pointer's
+        // click has already honked above. A keyboard click is itself a gesture, so it can unlock sound.
+        onClick={(event) => {
+          if (event.detail === 0) {
+            mixerRef.current?.unlock();
+            gameRef.current?.honk();
+          }
+        }}
       >
         <svg viewBox="0 0 64 64" aria-hidden="true">
           <circle cx="16" cy="32" r="11" fill="#e0483e" />
