@@ -356,7 +356,8 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     if (press) {
       return;
     }
-    // The first tap is the gesture browsers wait for before allowing sound.
+    // The first tap is the gesture browsers wait for before allowing sound: a mouse press counts, a finger's only on
+    // release, so `onPointerUp` unlocks too.
     mixer.unlock();
     canvas.setPointerCapture(event.pointerId);
     press = { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now(), holding: false };
@@ -376,6 +377,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   }
 
   function onPointerUp(event: PointerEvent): void {
+    mixer.unlock();
     if (!press || event.pointerId !== press.id) {
       return;
     }

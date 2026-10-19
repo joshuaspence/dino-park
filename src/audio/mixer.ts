@@ -4,7 +4,12 @@ export type Bus = 'music' | 'effects' | 'voice';
 export interface Mixer {
   readonly context: AudioContext;
   readonly buses: Readonly<Record<Bus, GainNode>>;
-  /** Starts sound. Browsers keep audio silent until a user gesture, so call this from one, such as the first tap. */
+  /** False until the browser lets sound play. */
+  readonly running: boolean;
+  /**
+   * Starts sound. Browsers keep audio silent until a user gesture, so call this from one. For touch, only the release
+   * counts (`pointerup`, not `pointerdown`), so unlock on both.
+   */
   unlock(): void;
   dispose(): void;
 }
@@ -20,6 +25,9 @@ export function createMixer(): Mixer {
   return {
     context,
     buses,
+    get running() {
+      return context.state === 'running';
+    },
     unlock() {
       if (context.state === 'suspended') {
         void context.resume();
