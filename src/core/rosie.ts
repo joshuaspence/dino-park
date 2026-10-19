@@ -107,6 +107,19 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
     lines.set(`rosie.load.${kind}`, `Got ${supply}!`);
   }
   CHEERS.forEach((cheer, i) => lines.set(`rosie.cheer.${i}`, cheer));
+  // Help, when the child taps her picture (docs/design.md §6).
+  lines.set('rosie.help.offer', "If you're ever stuck, tap my picture, and I'll show you what to do!");
+  lines.set('rosie.help.wait', "Everyone's happy right now! Let's drive around, and look for a bubble.");
+  for (const species of SPECIES_SPOKEN_OF) {
+    const name = SPECIES[species].residentName;
+    lines.set(
+      `rosie.help.take.${species}`,
+      `Let's take it to ${name}. Tap ${name}${name.endsWith('s') ? "'" : "'s"} pen!`,
+    );
+  }
+  for (const [kind, station] of Object.entries(STATION_NAMES)) {
+    lines.set(`rosie.help.fetch.${kind}`, `Tap the ${station}!`);
+  }
   return lines;
 }
 
@@ -152,6 +165,7 @@ export function rosieSays(event: CareEvent, after: Care): readonly Beat[] {
         return [
           { line: 'rosie.tutorial.done', focus: { pen: event.species } },
           { line: 'rosie.tutorial.egg', focus: { nest: true } },
+          { line: 'rosie.help.offer' },
         ];
       }
       return [{ line: eggReady(after) ? 'rosie.egg.ready' : `rosie.cheer.${after.needsMet % CHEERS.length}` }];

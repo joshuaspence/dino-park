@@ -744,14 +744,53 @@ test('Rosie walks a new player through their first delivery, showing them each p
   // Steggy's gate is along the road to the jeep's left. The delivery is cheered, and the egg explained at the nest.
   await tap(0.31, 0.53);
   await playFor(page, 5000, async () => (await canvas.getAttribute('data-needs')) === '');
-  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.done rosie.tutorial.egg');
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.done rosie.tutorial.egg rosie.help.offer');
   await expect(canvas).toHaveAttribute('data-pointer', '');
   expect(await said()).toEqual([
     'rosie.welcome rosie.tutorial.drive',
     'rosie.tutorial.need rosie.tutorial.station',
     'rosie.tutorial.load',
-    'rosie.tutorial.done rosie.tutorial.egg',
+    'rosie.tutorial.done rosie.tutorial.egg rosie.help.offer',
   ]);
+});
+
+test("Rosie's picture wiggles when the player is stuck, and shows them what to do", async ({ page }) => {
+  test.slow();
+  await page.clock.install();
+  await page.goto('./');
+  // Past the guided tour.
+  await savedPark(page, { version: 1, needsMet: 2, eggsHatched: 0 });
+  await page.reload();
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  const help = page.getByRole('button', { name: strings.help });
+
+  // Before anyone wants anything, there's nothing to show: she says so.
+  await help.click();
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.help.wait');
+  await expect(canvas).toHaveAttribute('data-pointer', '');
+
+  // A dinosaur asks, and nothing happens for a while: Rosie's picture wiggles.
+  await playFor(page, 4000);
+  const need = (await canvas.getAttribute('data-needs')) ?? '';
+  expect(need).toMatch(/^\w+:\w+$/);
+  await expect(help).not.toHaveClass(/stuck/);
+  await playFor(page, 21_000, async () => (await canvas.getAttribute('data-stuck')) === 'true');
+  await expect(help).toHaveClass(/stuck/);
+
+  // Tapped, she names who wants what and the station to tap, and the arrow points at it until it's done.
+  await help.click();
+  await playFor(page, 200);
+  await expect(help).not.toHaveClass(/stuck/);
+  await expect(canvas).toHaveAttribute(
+    'data-rosie',
+    new RegExp(`^rosie\\.need\\.${need.replace(':', '\\.')} rosie\\.help\\.fetch\\.\\w+$`),
+  );
+  await expect(canvas).toHaveAttribute('data-pointer', 'station');
+  await expect(canvas).toHaveAttribute('data-speaking', 'false', { timeout: 30_000 });
+  await playFor(page, 4000);
+  await expect(canvas).toHaveAttribute('data-pointer', 'station');
 });
 
 test('Rosie holds what she has to say until sound starts', async ({ page }) => {

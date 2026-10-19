@@ -95,6 +95,63 @@ body,
   height: 100%;
 }
 
+/* Ranger Rosie's picture, opposite the horn: tap her for help. */
+.help {
+  position: fixed;
+  left: max(1.5rem, env(safe-area-inset-left));
+  bottom: max(1.5rem, env(safe-area-inset-bottom));
+  width: 6.5rem;
+  height: 6.5rem;
+  padding: 0.6rem;
+  border: 0.35rem solid #fff;
+  border-radius: 50%;
+  background: #ffe9a8;
+  box-shadow: 0 0.4rem 0 #d0a43a;
+  touch-action: manipulation;
+}
+
+.help.sleeping {
+  opacity: 0.35;
+}
+
+.help:active {
+  transform: translateY(0.3rem);
+  box-shadow: 0 0.1rem 0 #d0a43a;
+}
+
+.help svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* A child who seems stuck sees Rosie wiggle in bursts, and her border glow, to say she's there to help. */
+.help.stuck {
+  border-color: #ff8a1f;
+  animation: help-wiggle 2.4s ease-in-out infinite;
+}
+
+@keyframes help-wiggle {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  68%,
+  84% {
+    transform: rotate(-12deg);
+  }
+  76%,
+  92% {
+    transform: rotate(12deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help.stuck {
+    animation: none;
+  }
+}
+
 /* The grown-up gate: small, faded and out of the way, so it doesn't invite a child's tap. */
 .parent-gate {
   position: fixed;

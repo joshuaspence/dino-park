@@ -7,22 +7,14 @@ import { AWAKE, type Bedtime, type BedtimeMinutes, stepBedtime, wake as wakeBedt
 import { createRosieVoice } from '../audio/rosie';
 import { loadVoices } from '../audio/voices';
 import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, pullOver, stepJeep } from '../core/jeep';
-import {
-  NEEDS_PER_EGG,
-  TUTORIAL_NEED,
-  eggProgress,
-  eggReady,
-  isSad,
-  startCare,
-  stepNeeds,
-  supplyFor,
-} from '../core/needs';
+import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
 import { type Beat, type Focus, type LineId, rosieSays, welcomeLine } from '../core/rosie';
 import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
 import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, UNLOCK_ORDER, speciesInPark } from '../core/species';
-import { FIRST_DRIVE, holdUntilDriven, tourStep } from '../core/tour';
+import { nextHint } from '../core/help';
+import { holdUntilDriven, tourStep } from '../core/tour';
 import { type DinoInstance, type DinoSkin, loadDinoSkin } from './dinoSkin';
 import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
@@ -40,12 +32,19 @@ export interface GameHandle {
   setBedtime(minutes: BedtimeMinutes, asleep: boolean): void;
   /** A grown-up wakes the park: it brightens, the music comes back and the timer starts again. */
   wake(): void;
+  /**
+   * The child asks Rosie for help (docs/design.md §6). She says what to do next, the camera shows where, and the
+   * arrow points the way until it's done.
+   */
+  help(): void;
   dispose(): void;
 }
 
 export interface GameHooks {
   /** The bedtime timer ran out and the park fell asleep, so the settings should remember it. */
   onAsleep(): void;
+  /** Whether the child seems stuck, so the help button can wiggle to show it's there. */
+  onStuck(stuck: boolean): void;
 }
 
 /** Day and dusk, which the park fades between as it goes to sleep and wakes (docs/design.md §7). */
@@ -101,6 +100,8 @@ const SHELL_SECONDS = 1.2;
 const ARROW_HEIGHT = 4.5;
 /** A tap this close to the arrow on screen, in CSS pixels, is a tap on what it points at. */
 const ARROW_TAP_PX = 48;
+/** How long without loading, delivering or hatching, while there's something to do, before the child seems stuck. */
+const STUCK_SECONDS = 20;
 /** Hatchlings stand in an arc on the nest's far side from the cross road, wrapping round once it's full. */
 const HATCHLING_SPOTS = 7;
 const HATCHLING_RING = 4.5;
@@ -196,6 +197,11 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   let welcomed = false;
   /** Whether the child has driven the jeep yet since the game opened: the guided tour's first step. */
   let driven = false;
+  /** True after the child asks for help, until what she suggested is done: the arrow keeps pointing the way. */
+  let helping = false;
+  /** Seconds since the child last got anywhere, for spotting when they're stuck. */
+  let sinceProgress = 0;
+  let stuck = false;
   /**
    * Rosie's latest lines from while sound can't play, kept for when it can. Given to her voice, they would wait in a
    * paused clip and play, out of turn, before her welcome.
@@ -451,7 +457,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     const from = nearestRoadPosition(roads, jeep.position);
     const to = nearestRoadPosition(roads, target);
     jeep = driveAlong(jeep, findRoute(roads, from, to));
-    driven ||= jeep.route.length > 0;
+    if (!driven && jeep.route.length > 0) {
+      driven = true;
+      sinceProgress = 0;
+    }
   }
 
   let press: { id: number; x: number; y: number; at: number; holding: boolean } | null = null;
@@ -620,6 +629,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       }
       arrow.visible = false;
       canvas.dataset.pointer = '';
+      if (stuck) {
+        stuck = false;
+        hooks.onStuck(false);
+      }
       return;
     }
     const jeepAt = { position: jeep.position, parked: jeep.route.length === 0 };
@@ -630,7 +643,16 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       void storePark(savePark(care));
     }
     for (const event of step.events) {
-      say(...rosieSays(event, care));
+      sinceProgress = 0;
+      if (event.type === 'deliver' || event.type === 'hatch') {
+        helping = false;
+      }
+      // Asked for help, she sticks to the job in hand: another dinosaur's bubble and call are enough to say it wants
+      // something, and a load is followed by where to take it, or where to fetch the right thing instead.
+      if (!(helping && event.type === 'need')) {
+        const helped = helping && event.type === 'load' && !tourStep(care, driven);
+        say(...(helped ? nextHint(care, PARK, driven).beats : rosieSays(event, care)));
+      }
       if (event.type === 'need') {
         playNeed(mixer);
         voices.play(event.species, 'need');
@@ -687,21 +709,24 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     canvas.dataset.cargo = care.cargo ?? '';
     canvas.dataset.eggsHatched = String(care.eggsHatched);
 
-    const tour = tourStep(care, driven);
-    pointAt =
-      tour === 'drive'
-        ? FIRST_DRIVE
-        : tour === 'pen'
-          ? tutorialPen && penGate(tutorialPen)
-          : tour === 'station'
-            ? tutorialStation?.position
-            : undefined;
+    // The arrow shows the way through the guided tour, and after the child asks for help.
+    const hint = nextHint(care, PARK, driven);
+    helping &&= hint.target !== null;
+    pointAt = (tourStep(care, driven) || helping) && hint.target ? hint.target : undefined;
     arrow.visible = pointAt !== undefined;
     if (pointAt) {
       arrow.position.set(pointAt.x, ARROW_HEIGHT + Math.sin(timer.getElapsed() * 4) * 0.4, pointAt.z);
       arrow.rotation.y += delta * 2;
     }
-    canvas.dataset.pointer = pointAt ? (tour ?? '') : '';
+    canvas.dataset.pointer = pointAt ? (hint.kind ?? '') : '';
+
+    sinceProgress += delta;
+    const nowStuck = !helping && hint.target !== null && sinceProgress >= STUCK_SECONDS;
+    if (nowStuck !== stuck) {
+      stuck = nowStuck;
+      hooks.onStuck(stuck);
+    }
+    canvas.dataset.stuck = String(stuck);
   }
 
   const timer = new THREE.Timer();
@@ -852,17 +877,13 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     canvas.dataset.rosie = said.map(({ line }) => line).join(' ');
   }
 
-  // The guided tour's arrow: over the road to drive to, then over the station until its supply is on the jeep, then
-  // over the dinosaur's gate.
+  // The arrow over where to drive next, during the guided tour and after the child asks for help.
   const arrow = new THREE.Mesh(
     new THREE.ConeGeometry(0.9, 2, 4).rotateX(Math.PI),
     new THREE.MeshStandardMaterial({ color: 0xff8a1f, emissive: 0x803000, flatShading: true }),
   );
   arrow.visible = false;
   scene.add(arrow);
-  const tutorialSupply = supplyFor(TUTORIAL_NEED.kind, TUTORIAL_NEED.species);
-  const tutorialStation = PARK.stations.find((station) => station.kind === tutorialSupply);
-  const tutorialPen = PARK.pens.find((pen) => pen.species === TUTORIAL_NEED.species);
   const music = startMusic(mixer);
 
   const colour = (hex: number) => new THREE.Color(hex);
@@ -909,6 +930,15 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
         jeep = pullOver(jeep);
         music.setPlaying(false);
       }
+    },
+    help() {
+      if (bedtime.asleep || !loaded || !settingsKnown) {
+        return;
+      }
+      const hint = nextHint(care, PARK, driven);
+      helping = hint.target !== null;
+      sinceProgress = 0;
+      say(...hint.beats);
     },
     wake() {
       if (!bedtime.asleep) {
