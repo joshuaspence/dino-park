@@ -1,4 +1,14 @@
-import { expect, test } from '@playwright/test';
+import { type Page, expect, test } from '@playwright/test';
+
+/**
+ * Plays `ms` of game time on a fake clock in 100 ms frames, the most the game steps in one frame. `runFor` would
+ * render a frame every 16 ms, which CI's software rendering is far too slow for over several seconds.
+ */
+async function playFor(page: Page, ms: number): Promise<void> {
+  for (let played = 0; played < ms; played += 100) {
+    await page.clock.fastForward(100);
+  }
+}
 
 test('loads the dinosaurs and animates them without errors', async ({ page }) => {
   const errors: string[] = [];
@@ -74,7 +84,7 @@ test('a dinosaur asks for something soon after the park opens', async ({ page })
   const canvas = page.locator('canvas.world');
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   await expect(canvas).toHaveAttribute('data-needs', '');
-  await page.clock.runFor(4000);
+  await playFor(page, 4000);
   await expect(canvas).toHaveAttribute('data-needs', /^\w+:\w+$/);
 });
 
@@ -91,7 +101,7 @@ test('loads the toy shed when the jeep stops there', async ({ page }) => {
   }
   // The toy shed is just up and to the left of where the jeep starts.
   await canvas.click({ position: { x: box.width * 0.36, y: box.height * 0.42 } });
-  await page.clock.runFor(6000);
+  await playFor(page, 6000);
   await expect(canvas).toHaveAttribute('data-moving', 'false');
   await expect(canvas).toHaveAttribute('data-cargo', 'toys');
 });
