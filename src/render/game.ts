@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 
 import { type Jeep, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
+import { isSad, startCare, stepNeeds } from '../core/needs';
 import { PARK, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition } from '../core/roads';
-import { ROSIE_MODEL, SPECIES } from '../core/species';
+import { ROSIE_MODEL, SPECIES, type SpeciesId } from '../core/species';
 import { type DinoInstance, loadDinoSkin } from './dinoSkin';
+import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
 import { buildPark } from './parkScene';
 
@@ -25,6 +27,11 @@ const HOLD_REPLAN_SECONDS = 0.25;
 const SNAP_DISTANCE = 7;
 const TRAIL_SPACING = 1.6;
 const TRAIL_MAX_DOTS = 120;
+/** Need bubbles float above the tallest dinosaur's head. */
+const BUBBLE_HEIGHT = 8;
+const BUBBLE_SIZE = 3.5;
+/** A sad bubble grows by this much, so a long wait is easy to spot. */
+const SAD_GROWTH = 1.4;
 
 /** The spots worth driving to: pen gates and stations. */
 const DESTINATIONS: Point[] = [...PARK.pens.map(penGate), ...PARK.stations.map((station) => station.position)];
@@ -79,6 +86,22 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   scene.add(trail);
 
   const dinos: DinoInstance[] = [];
+  const herds = new Map<SpeciesId, DinoInstance[]>();
+
+  let care = startCare(PARK);
+  const bubbles = PARK.pens.map((pen) => {
+    const bubble = new THREE.Sprite();
+    bubble.position.set(pen.position.x, BUBBLE_HEIGHT, pen.position.z);
+    bubble.visible = false;
+    scene.add(bubble);
+    return bubble;
+  });
+  // Floating over the jeep, clear of Rosie and the roll bar, so the child can see what they're carrying.
+  const cargo = new THREE.Sprite();
+  cargo.position.set(0, 4, -0.6);
+  cargo.scale.setScalar(2.6);
+  cargo.visible = false;
+  jeepModel.add(cargo);
   let disposed = false;
 
   async function populate(): Promise<void> {
@@ -103,6 +126,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
         continue;
       }
       const herdSize = SPECIES[pen.species].herdSize;
+      const herd: DinoInstance[] = [];
+      herds.set(pen.species, herd);
       for (let i = 0; i < herdSize; i++) {
         const dino = skin.create();
         dino.object.position.set(pen.position.x + (i - (herdSize - 1) / 2) * 2.5, 0, pen.position.z);
@@ -110,6 +135,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
         dino.object.rotation.y = pen.position.x < 0 ? 0.7 : -0.7;
         scene.add(dino.object);
         dinos.push(dino);
+        herd.push(dino);
       }
     }
     canvas.dataset.ready = 'true';
@@ -226,6 +252,42 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     trail.instanceMatrix.needsUpdate = true;
   }
 
+  function updateCare(delta: number): void {
+    const step = stepNeeds(care, PARK, { position: jeep.position, parked: jeep.route.length === 0 }, delta);
+    care = step.care;
+    for (const event of step.events) {
+      if (event.type === 'deliver') {
+        for (const dino of herds.get(event.species) ?? []) {
+          dino.play('jump');
+        }
+      }
+    }
+
+    const bob = Math.sin(timer.getElapsed() * 2.5) * 0.25;
+    care.residents.forEach((resident, i) => {
+      const bubble = bubbles[i];
+      if (!bubble) {
+        return;
+      }
+      bubble.visible = resident.need !== null;
+      if (resident.need) {
+        const sad = isSad(resident.need);
+        bubble.material = iconMaterial(needIcon(resident.need.kind, resident.species), { bubble: true, sad });
+        bubble.scale.setScalar(BUBBLE_SIZE * (sad ? SAD_GROWTH : 1));
+        bubble.position.y = BUBBLE_HEIGHT + bob;
+      }
+    });
+    cargo.visible = care.cargo !== null;
+    if (care.cargo) {
+      cargo.material = iconMaterial(cargoIcon(care.cargo));
+    }
+
+    canvas.dataset.needs = care.residents
+      .flatMap((resident) => (resident.need ? [`${resident.species}:${resident.need.kind}`] : []))
+      .join(' ');
+    canvas.dataset.cargo = care.cargo ?? '';
+  }
+
   const timer = new THREE.Timer();
   timer.connect(document);
   renderer.setAnimationLoop(() => {
@@ -252,6 +314,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     }
     canvas.dataset.moving = String(jeep.route.length > 0);
     updateTrail();
+    updateCare(delta);
 
     sun.position.set(jeep.position.x + 15, 30, jeep.position.z + 10);
     sun.target.position.set(jeep.position.x, 0, jeep.position.z);
