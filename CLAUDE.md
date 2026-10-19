@@ -41,5 +41,6 @@ same PR when a decision changes.
 pnpm install
 pnpm lint && pnpm typecheck && pnpm test
 pnpm build && pnpm budget
-pnpm test:e2e     # Chromium + WebKit; set PLAYWRIGHT_CHROMIUM_PATH to use a preinstalled Chromium
+pnpm test:e2e     # Chromium + WebKit; set PLAYWRIGHT_CHROMIUM_PATH to use a preinstalled Chromium,
+                  # and PLAYWRIGHT_PORT if another checkout's preview already holds port 4173
 ```
