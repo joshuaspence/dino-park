@@ -611,13 +611,18 @@ test('Rosie walks a new player through their first delivery', async ({ page }) =
 });
 
 test('Rosie holds what she has to say until sound starts', async ({ page }) => {
-  // A tablet keeps sound silent until the first tap, which headless browsers don't, so start it suspended here.
+  // A tablet keeps sound silent until the first tap, which headless browsers don't. Report it suspended until the
+  // game resumes it, rather than suspending it for real: WebKit never finishes that, and goes to "interrupted".
   await page.addInitScript(() => {
     const Original = window.AudioContext;
+    const resumed = new WeakSet<AudioContext>();
     window.AudioContext = class extends Original {
-      constructor(options?: AudioContextOptions) {
-        super(options);
-        void this.suspend();
+      override get state(): AudioContextState {
+        return resumed.has(this) ? super.state : 'suspended';
+      }
+      override resume(): Promise<void> {
+        resumed.add(this);
+        return super.resume();
       }
     };
   });
@@ -631,13 +636,8 @@ test('Rosie holds what she has to say until sound starts', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-needs', 'stegosaurus:bored');
   await expect(canvas).not.toHaveAttribute('data-rosie');
 
-  // Once it starts, Rosie says hello, and then what she held back. Sound starts in real time, but frames only come
-  // with the fake clock, so keep playing until a frame sees it.
+  // Once it starts, Rosie says hello, and then what she held back.
   await page.getByRole('button', { name: 'Honk' }).click();
-  await expect
-    .poll(async () => {
-      await playFor(page, 100);
-      return canvas.getAttribute('data-rosie');
-    })
-    .toBe('rosie.tutorial.need');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need');
 });
