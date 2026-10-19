@@ -70,8 +70,10 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   moves aside.
 - **Honk button:** big and always available; the nearest dinosaur turns to look.
 - **Keyboard and gamepad** (arrows/WASD to steer and accelerate) as an extra, never required.
-- **Automatic chase camera:** third-person, a little above the jeep, pulling back slightly while
-  driving and zooming in on the dinosaur during a delivery. The child never controls the camera.
+- **Automatic follow camera:** third-person, above and behind the jeep, pulling back slightly while
+  driving and zooming in on the dinosaur during a delivery. The child never controls the camera. It
+  keeps **one compass direction** rather than swinging round behind the jeep at every turn, so a spot
+  the child is about to tap never slides away under their finger.
 
 ## 5. The park and its dinosaurs
 
@@ -149,7 +151,9 @@ Behind a **grown-up gate** (hold for 3 seconds, then tap a named number):
   (Rosie), each with Idle, Walk, Run, Jump, Attack and Death clips. `scripts/import-dinos.mjs`
   converts it, keeps only idle/walk/run/jump — **jump is the happy hop** — and Meshopt-compresses it
   (about 1.2 MB for all six). The models share one unit, so one scale keeps their relative sizes;
-  Rosie is scaled up because the pack's Parasaurolophus is small. Recolours are keyed by the pack's
+  Rosie is scaled up because the pack's Parasaurolophus is small. Dinosaurs are **larger than
+  life** next to the jeep (a T. rex is about 7.7 m long) because big, readable animals matter more
+  to small children than true scale. Recolours are keyed by the pack's
   material names. **Pterodactyl and Ankylosaurus have no model yet**: find one before M2, otherwise
   build them procedurally.
 
