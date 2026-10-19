@@ -631,8 +631,13 @@ test('Rosie holds what she has to say until sound starts', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-needs', 'stegosaurus:bored');
   await expect(canvas).not.toHaveAttribute('data-rosie');
 
-  // Once it starts, Rosie says hello, and then what she held back.
+  // Once it starts, Rosie says hello, and then what she held back. Sound starts in real time, but frames only come
+  // with the fake clock, so keep playing until a frame sees it.
   await page.getByRole('button', { name: 'Honk' }).click();
-  await playFor(page, 200);
-  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need');
+  await expect
+    .poll(async () => {
+      await playFor(page, 100);
+      return canvas.getAttribute('data-rosie');
+    })
+    .toBe('rosie.tutorial.need');
 });
