@@ -482,3 +482,22 @@ test('resets the park from the parent area, after asking', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-eggs-hatched', '0');
   expect(await savedPark(page)).toEqual({ version: 1, needsMet: 0, eggsHatched: 0 });
 });
+
+test('plays the background music once sound starts', async ({ page }) => {
+  // Record what the game asks to play, so the test can tell the music started without hearing it.
+  await page.addInitScript(() => {
+    const played: string[] = [];
+    Object.assign(window, { played });
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+      played.push(this.currentSrc || this.src);
+      return play.call(this);
+    };
+  });
+  await page.goto('./');
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { played: string[] }).played))
+    .toEqual([expect.stringContaining('/audio/music/park.mp3')]);
+});

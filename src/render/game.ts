@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import { playDeliver, playHatch, playHonk, playLoad, playNeed, startEngine } from '../audio/effects';
 import type { Mixer } from '../audio/mixer';
+import { startMusic } from '../audio/music';
 import { loadVoices } from '../audio/voices';
 import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
@@ -674,6 +675,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   const steering = startSteering(window, () => mixer.unlock());
   const engine = startEngine(mixer);
   const voices = loadVoices(mixer);
+  const music = startMusic(mixer);
   let sinceSteer = HOLD_REPLAN_SECONDS;
 
   return {
@@ -682,6 +684,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
       disposed = true;
       steering.dispose();
       engine.stop();
+      music.stop();
       renderer.setAnimationLoop(null);
       timer.dispose();
       observer.disconnect();

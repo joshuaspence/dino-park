@@ -143,7 +143,9 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
 - **Each dinosaur has its own voice** (roar, chirp, honk) for wanting something, being helped and
   sleeping, so children can hear who needs help.
 - **Gentle looping background music**, plus sound effects. Most effects (honk, engine, chimes,
-  splashes) are synthesised with the Web Audio API; roars are recorded audio files.
+  splashes) are synthesised with the Web Audio API; roars are recorded audio files. The music is
+  "Once Upon a Time (loop)" by TAD (CC0, OpenGameArt), streamed rather than decoded whole, since a
+  decoded two-minute track would hold about 40 MB on a budget tablet.
 - Three audio buses — **music, effects, voice** — each with its own volume. Silent until the first
   tap (browser autoplay rules).
 
