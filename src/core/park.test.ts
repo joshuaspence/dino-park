@@ -1,9 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
 import { NEED_KINDS, supplyFor, visitedPlace } from './needs';
-import { MAX_REACH, PARK, type Pen, ROAD_WIDTH, penGate } from './park';
+import { PARK, type Pen, ROAD_WIDTH, penGate } from './park';
 import { type Point, findRoute, nearestRoadPosition } from './roads';
 import { LAUNCH_SPECIES } from './species';
+
+/** The road stop nearest `place`, and points on the road up to 2 m either side of it. */
+function stopsNear(place: Point): Point[] {
+  const stop = nearestRoadPosition(PARK.roads, place).point;
+  const nudges = [
+    { x: 0, z: 0 },
+    { x: 2, z: 0 },
+    { x: -2, z: 0 },
+    { x: 0, z: 2 },
+    { x: 0, z: -2 },
+  ];
+  return nudges.map((nudge) => nearestRoadPosition(PARK.roads, { x: stop.x + nudge.x, z: stop.z + nudge.z }).point);
+}
 
 /** Points every half metre or so around a pen's fence line. */
 function fencePosts({ position, halfSize }: Pen): Point[] {
@@ -39,23 +52,15 @@ describe('PARK', () => {
     }
   });
 
-  it('is visiting each station and pen when parked at the road nearest it', () => {
-    for (const station of PARK.stations) {
-      const stop = nearestRoadPosition(PARK.roads, station.position).point;
-      expect(visitedPlace(PARK, stop)?.station).toBe(station);
-    }
-    for (const pen of PARK.pens) {
-      const stop = nearestRoadPosition(PARK.roads, penGate(pen)).point;
-      expect(visitedPlace(PARK, stop)?.pen).toBe(pen);
-    }
-  });
-
-  it('puts every pen gate and station within reach of a road', () => {
-    for (const pen of PARK.pens) {
-      expect(nearestRoadPosition(PARK.roads, penGate(pen)).distance).toBeLessThanOrEqual(MAX_REACH);
-    }
-    for (const station of PARK.stations) {
-      expect(nearestRoadPosition(PARK.roads, station.position).distance).toBeLessThanOrEqual(MAX_REACH);
+  it('visits each station and pen from its road stop, even stopping a little short or long of it', () => {
+    const places = [
+      ...PARK.stations.map((station) => ({ place: station.position, visit: { station } })),
+      ...PARK.pens.map((pen) => ({ place: penGate(pen), visit: { pen } })),
+    ];
+    for (const { place, visit } of places) {
+      for (const stop of stopsNear(place)) {
+        expect(visitedPlace(PARK, stop)).toEqual(visit);
+      }
     }
   });
 

@@ -26,8 +26,8 @@ export interface Park {
 }
 
 /**
- * The farthest a pen gate or station may be from the road it's reached by, and so how close the jeep must be to
- * visit it. Water and bath sit right at this distance, 9 m from the loop.
+ * How close the jeep must be to a pen gate or station to visit it. Each sits a couple of metres nearer its road
+ * than this, because hold-to-drive rarely stops exactly level with one.
  */
 export const MAX_REACH = 9;
 
@@ -81,8 +81,8 @@ export const PARK: Park = {
   stations: [
     { kind: 'hay', position: { x: -8, z: -18 } },
     { kind: 'meat', position: { x: 8, z: -18 } },
-    { kind: 'water', position: { x: -27, z: 0 } },
-    { kind: 'bath', position: { x: 27, z: 0 } },
+    { kind: 'water', position: { x: -29, z: 0 } },
+    { kind: 'bath', position: { x: 29, z: 0 } },
     { kind: 'toys', position: { x: -8, z: 18 } },
     { kind: 'vet', position: { x: 8, z: 18 } },
   ],
