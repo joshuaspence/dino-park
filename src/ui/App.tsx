@@ -19,7 +19,7 @@ export function App() {
   /** Whether the current press on the honk button has already honked. */
   const honked = useRef(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  /** The latest settings, for the game's callback, which outlives any one render. */
+  /** The latest settings, which the game's callback and the parent area's changes build on. */
   const settingsRef = useRef(settings);
   useEffect(() => {
     settingsRef.current = settings;
@@ -47,12 +47,15 @@ export function App() {
     }
   });
 
+  // Each change builds on the latest settings, not this render's: the park can fall asleep between a render and a
+  // grown-up's next change, and building on `settings` would undo that.
   const setVolume = (bus: Bus, volume: number) => {
-    changeSettings({ ...settings, volumes: { ...settings.volumes, [bus]: volume } });
+    const current = settingsRef.current;
+    changeSettings({ ...current, volumes: { ...current.volumes, [bus]: volume } });
   };
-  const setBedtime = (minutes: BedtimeMinutes) => changeSettings({ ...settings, bedtime: minutes });
+  const setBedtime = (minutes: BedtimeMinutes) => changeSettings({ ...settingsRef.current, bedtime: minutes });
   const wake = () => {
-    changeSettings({ ...settings, asleep: false });
+    changeSettings({ ...settingsRef.current, asleep: false });
     // A grown-up's tap is a gesture, so good morning can be heard even if nobody has tapped the park yet.
     mixerRef.current?.unlock();
     gameRef.current?.wake();
