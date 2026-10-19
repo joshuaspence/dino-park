@@ -1,6 +1,6 @@
 import { MAX_REACH, type Park, type Pen, type Station, type StationKind, penGate } from './park';
 import { type Point, distance } from './roads';
-import { type Diet, SPECIES, type SpeciesId } from './species';
+import { type Diet, SPECIES, type SpeciesId, UNLOCK_ORDER } from './species';
 
 /** What a dinosaur can want, each shown as a single picture in its bubble (docs/design.md §3). */
 export type NeedKind = 'hungry' | 'thirsty' | 'dirty' | 'bored' | 'poorly';
@@ -17,6 +17,8 @@ export const MAX_NEEDS = 2;
 export const SAD_SECONDS = 40;
 /** How long a dinosaur celebrates after being helped, during which it won't want anything. */
 export const HAPPY_SECONDS = 3;
+/** Needs met per egg: about five minutes of play (docs/design.md §5). */
+export const NEEDS_PER_EGG = 5;
 
 export interface Need {
   readonly kind: NeedKind;
@@ -39,12 +41,18 @@ export interface Care {
   readonly cargo: StationKind | null;
   /** Needs met so far, towards eggs. */
   readonly needsMet: number;
+  readonly eggsHatched: number;
 }
 
 export type CareEvent =
   | { readonly type: 'need'; readonly species: SpeciesId; readonly kind: NeedKind }
   | { readonly type: 'load'; readonly cargo: StationKind }
-  | { readonly type: 'deliver'; readonly species: SpeciesId; readonly kind: NeedKind };
+  | { readonly type: 'deliver'; readonly species: SpeciesId; readonly kind: NeedKind }
+  /** `species` is null once everything has hatched; later eggs will hatch babies (docs/design.md §5). */
+  | { readonly type: 'hatch'; readonly species: SpeciesId | null };
+
+/** Somewhere the jeep can be visiting: a station, a pen's gate, or the egg nest. */
+export type Visit = { readonly station: Station } | { readonly pen: Pen } | { readonly nest: true };
 
 const FOOD: Readonly<Record<Diet, StationKind>> = { plants: 'hay', meat: 'meat', fish: 'fish' };
 
@@ -70,7 +78,17 @@ export function startCare(park: Park): Care {
     untilNextNeed: FIRST_NEED_SECONDS,
     cargo: null,
     needsMet: 0,
+    eggsHatched: 0,
   };
+}
+
+/** How far the next egg has come, from 0 to NEEDS_PER_EGG. Needs met while an egg waits count towards the next. */
+export function eggProgress(care: Care): number {
+  return Math.min(NEEDS_PER_EGG, care.needsMet - care.eggsHatched * NEEDS_PER_EGG);
+}
+
+export function eggReady(care: Care): boolean {
+  return eggProgress(care) >= NEEDS_PER_EGG;
 }
 
 /** Where the jeep is, and whether it has stopped there. */
@@ -82,7 +100,9 @@ export interface JeepAt {
 /**
  * Advances needs by `seconds` and handles the jeep's visits. A parked jeep loads from the nearest station in
  * reach; driving past one doesn't, so a trip back from the haystack can't swap its hay for water on the way. A
- * jeep near a pen delivers whenever its cargo is what that dinosaur needs, parked or not.
+ * jeep near a pen delivers whenever its cargo is what that dinosaur needs, parked or not. A ready egg hatches
+ * only when the jeep stops at the nest, since the cross road runs past it and a hatch is the moment the child came
+ * for.
  */
 export function stepNeeds(
   care: Care,
@@ -97,7 +117,7 @@ export function stepNeeds(
     need: resident.need && { ...resident.need, age: resident.need.age + seconds },
     happyFor: Math.max(0, resident.happyFor - seconds),
   }));
-  let { cargo, needsMet } = care;
+  let { cargo, needsMet, eggsHatched } = care;
 
   // While the park is full the countdown waits, so meeting a need brings a calm gap rather than a new demand.
   const full = residents.filter((resident) => resident.need).length >= MAX_NEEDS;
@@ -119,11 +139,11 @@ export function stepNeeds(
   }
 
   const visiting = visitedPlace(park, jeep.position);
-  if (visiting?.station && jeep.parked && visiting.station.kind !== cargo) {
+  if (visiting && 'station' in visiting && jeep.parked && visiting.station.kind !== cargo) {
     cargo = visiting.station.kind;
     events.push({ type: 'load', cargo });
   }
-  const helped = visiting?.pen && residents[park.pens.indexOf(visiting.pen)];
+  const helped = visiting && 'pen' in visiting ? residents[park.pens.indexOf(visiting.pen)] : undefined;
   const need = helped?.need;
   if (helped && need && cargo === supplyFor(need.kind, helped.species)) {
     events.push({ type: 'deliver', species: helped.species, kind: need.kind });
@@ -133,18 +153,22 @@ export function stepNeeds(
     cargo = null;
     needsMet += 1;
   }
+  if (visiting && 'nest' in visiting && jeep.parked && eggReady({ ...care, needsMet, eggsHatched })) {
+    events.push({ type: 'hatch', species: UNLOCK_ORDER[eggsHatched] ?? null });
+    eggsHatched += 1;
+  }
 
-  return { care: { residents, untilNextNeed, cargo, needsMet }, events };
+  return { care: { residents, untilNextNeed, cargo, needsMet, eggsHatched }, events };
 }
 
 /**
- * The station or pen gate nearest `position`, if one is within reach. Stations and gates compete, so a jeep
- * stopped at a pen next to a station delivers there rather than loading from the station.
+ * The station, pen gate or nest nearest `position`, if one is within reach. They compete, so a jeep stopped at a
+ * pen next to a station delivers there rather than loading from the station.
  */
-export function visitedPlace(park: Park, position: Point): { station?: Station; pen?: Pen } | undefined {
-  let best: { station?: Station; pen?: Pen } | undefined;
+export function visitedPlace(park: Park, position: Point): Visit | undefined {
+  let best: Visit | undefined;
   let bestDistance = MAX_REACH;
-  const consider = (place: Point, visit: { station?: Station; pen?: Pen }) => {
+  const consider = (place: Point, visit: Visit) => {
     const gap = distance(place, position);
     if (gap <= bestDistance) {
       best = visit;
@@ -157,6 +181,7 @@ export function visitedPlace(park: Park, position: Point): { station?: Station; 
   for (const pen of park.pens) {
     consider(penGate(pen), { pen });
   }
+  consider(park.nest, { nest: true });
   return best;
 }
 

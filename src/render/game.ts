@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
 import { type Jeep, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
-import { isSad, startCare, stepNeeds } from '../core/needs';
+import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
 import { PARK, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition } from '../core/roads';
-import { ROSIE_MODEL, SPECIES, type SpeciesId } from '../core/species';
+import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId } from '../core/species';
 import { type DinoInstance, loadDinoSkin } from './dinoSkin';
 import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
@@ -32,9 +32,26 @@ const BUBBLE_HEIGHT = 8;
 const BUBBLE_SIZE = 3.5;
 /** A sad bubble grows by this much, so a long wait is easy to spot. */
 const SAD_GROWTH = 1.4;
+/** An egg starts small and grows with each need met, to a full size big enough to be the moment it is. */
+const EGG_START_SIZE = 0.6;
+const EGG_FULL_SIZE = 1.5;
+const SHELL_SECONDS = 1.2;
+/** Hatchlings stand in an arc on the nest's far side from the cross road, wrapping round once it's full. */
+const HATCHLING_SPOTS = 7;
+const HATCHLING_RING = 4.5;
+const HATCHLING_ARC = (2 * Math.PI) / 5;
 
-/** The spots worth driving to: pen gates and stations. */
-const DESTINATIONS: Point[] = [...PARK.pens.map(penGate), ...PARK.stations.map((station) => station.position)];
+function hatchlingSpot(index: number): Point {
+  const angle = ((index % HATCHLING_SPOTS) / (HATCHLING_SPOTS - 1) - 0.5) * 2 * HATCHLING_ARC;
+  return { x: PARK.nest.x + HATCHLING_RING * Math.cos(angle), z: PARK.nest.z + HATCHLING_RING * Math.sin(angle) };
+}
+
+/** The spots worth driving to: pen gates, stations and the nest. */
+const DESTINATIONS: Point[] = [
+  ...PARK.pens.map(penGate),
+  ...PARK.stations.map((station) => station.position),
+  PARK.nest,
+];
 
 function snapToDestination(point: Point): Point {
   let best = point;
@@ -102,6 +119,68 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   cargo.scale.setScalar(2.6);
   cargo.visible = false;
   jeepModel.add(cargo);
+
+  const shellMaterial = new THREE.MeshStandardMaterial({ color: 0xfff6e0, flatShading: true, roughness: 0.6 });
+  const egg = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10).scale(0.8, 1, 0.8), shellMaterial);
+  egg.castShadow = true;
+  egg.position.set(PARK.nest.x, 0, PARK.nest.z);
+  egg.scale.setScalar(EGG_START_SIZE);
+  for (const [x, y, z] of [
+    [0.6, 0.3, 0.4],
+    [-0.5, 0.5, 0.5],
+    [0.1, -0.2, 0.78],
+    [-0.3, 0.1, -0.75],
+  ] as const) {
+    const spot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0x7fc97f, flatShading: true }),
+    );
+    spot.position.set(x, y, z);
+    egg.add(spot);
+  }
+  scene.add(egg);
+
+  /** Half-shells flying apart after a hatch, removed once they land. */
+  const shells: { mesh: THREE.Mesh; velocity: THREE.Vector3; age: number }[] = [];
+
+  async function hatch(species: SpeciesId | null): Promise<void> {
+    for (const side of [-1, 1]) {
+      const half = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 6, 0, 2 * Math.PI, 0, Math.PI / 2), shellMaterial);
+      half.position.copy(egg.position);
+      half.scale.copy(egg.scale);
+      half.rotation.z = side === 1 ? 0 : Math.PI;
+      shells.push({ mesh: half, velocity: new THREE.Vector3(side * 3, 6, 1.5), age: 0 });
+      scene.add(half);
+    }
+    // An egg always brings out a dinosaur. One whose species has no model yet, or that comes after everything has
+    // hatched, is a half-size baby of a launch dinosaur instead (docs/design.md §5).
+    const model = species && SPECIES[species].model;
+    const babyModels = LAUNCH_SPECIES.flatMap((id) => SPECIES[id].model ?? []);
+    const standIn = model ? null : (babyModels[Math.floor(Math.random() * babyModels.length)] ?? null);
+    const hatchling = model ?? standIn;
+    if (!hatchling) {
+      return;
+    }
+    const skin = await loadDinoSkin(hatchling);
+    if (disposed) {
+      return;
+    }
+    // The hatchlings wait by the nest until their own area opens.
+    const herdSize = species && model ? SPECIES[species].herdSize : 1;
+    for (let i = 0; i < herdSize; i++) {
+      const dino = skin.create();
+      if (standIn) {
+        dino.object.scale.multiplyScalar(0.5);
+      }
+      const spot = hatchlingSpot(hatchlings++);
+      dino.object.position.set(spot.x, 0, spot.z);
+      dino.object.rotation.y = Math.atan2(spot.x - PARK.nest.x, spot.z - PARK.nest.z);
+      scene.add(dino.object);
+      dino.play('jump');
+      dinos.push(dino);
+    }
+  }
+  let hatchlings = 0;
   let disposed = false;
 
   async function populate(): Promise<void> {
@@ -260,6 +339,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
         for (const dino of herds.get(event.species) ?? []) {
           dino.play('jump');
         }
+      } else if (event.type === 'hatch') {
+        // The shells take the full egg's size, so burst it before the next egg starts small.
+        void hatch(event.species);
+        egg.scale.setScalar(EGG_START_SIZE);
       }
     }
 
@@ -277,6 +360,24 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
         bubble.position.y = BUBBLE_HEIGHT + bob;
       }
     });
+    const eggSize = THREE.MathUtils.lerp(EGG_START_SIZE, EGG_FULL_SIZE, eggProgress(care) / NEEDS_PER_EGG);
+    egg.scale.setScalar(THREE.MathUtils.damp(egg.scale.x, eggSize, 4, delta));
+    egg.position.y = 0.3 + egg.scale.y;
+    // A ready egg wobbles in bursts, so it catches the eye without buzzing constantly.
+    const elapsed = timer.getElapsed();
+    egg.rotation.z = eggReady(care) ? Math.sin(elapsed * 14) * 0.2 * Math.max(0, Math.sin(elapsed * 2)) : 0;
+    for (const shell of shells) {
+      shell.age += delta;
+      shell.velocity.y -= 15 * delta;
+      shell.mesh.position.addScaledVector(shell.velocity, delta);
+      shell.mesh.rotation.x += delta * 6;
+    }
+    for (const shell of shells.filter((candidate) => candidate.age > SHELL_SECONDS)) {
+      scene.remove(shell.mesh);
+      shell.mesh.geometry.dispose();
+      shells.splice(shells.indexOf(shell), 1);
+    }
+
     cargo.visible = care.cargo !== null;
     if (care.cargo) {
       cargo.material = iconMaterial(cargoIcon(care.cargo));

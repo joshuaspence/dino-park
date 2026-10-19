@@ -100,6 +100,15 @@ function buildPen(pen: Pen): THREE.Group {
   return group;
 }
 
+/** A ring of straw for eggs to sit in. */
+function buildNest(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'nest';
+  const ring = mesh(new THREE.TorusGeometry(1.5, 0.45, 8, 16).rotateX(Math.PI / 2), 0xd9a441, 0, 0.4, 0);
+  group.add(ring, mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.2, 16), 0xb7862f, 0, 0.15, 0));
+  return group;
+}
+
 /** Simple, chunky stand-ins for each station, recognisable by shape and colour. */
 function buildStation(kind: StationKind): THREE.Group {
   const group = new THREE.Group();
@@ -172,6 +181,9 @@ export function buildPark(park: Park): THREE.Group {
   for (const pen of park.pens) {
     group.add(buildPen(pen));
   }
+  const nest = buildNest();
+  nest.position.set(park.nest.x, 0, park.nest.z);
+  group.add(nest);
   for (const station of park.stations) {
     const model = buildStation(station.kind);
     model.position.set(station.position.x, 0, station.position.z);

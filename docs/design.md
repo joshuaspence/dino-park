@@ -105,6 +105,11 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
 - **Pacing:** about one egg per five needs met (roughly 5 minutes of play). The egg sits in a nest
   by the visitor centre, wobbles, and hatches with a big celebration. All launch-era unlocks take
   about an hour of play spread over days. There is **no end state**.
+- **The egg shows its progress.** It sits in the nest from the start and grows with each need met;
+  once full it wobbles, and **driving to the nest hatches it**, so the child makes the big moment
+  happen rather than it happening somewhere off-screen. Needs met while a full egg waits count
+  towards the next one. The nest is a place like a station, with its own road stop beside the
+  junction at the middle of the park.
 - Later, purely cosmetic: day/night and weather.
 
 ## 6. Ranger Rosie, voice and sound
@@ -164,7 +169,8 @@ Behind a **grown-up gate** (hold for 3 seconds, then tap a named number):
   life** next to the jeep (a T. rex is about 7.7 m long) because big, readable animals matter more
   to small children than true scale. Recolours are keyed by the pack's
   material names. **Pterodactyl and Ankylosaurus have no model yet**: find one before M2, otherwise
-  build them procedurally.
+  build them procedurally. Until then their eggs, like any egg after everything has hatched, bring
+  out a half-size baby of a launch dinosaur, so an egg is never empty.
 
 ## 9. Tech stack
 
