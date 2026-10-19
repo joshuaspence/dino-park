@@ -152,6 +152,11 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   let loaded = false;
   /** Rosie says hello once, when the park has loaded and there's sound to hear her by. */
   let welcomed = false;
+  /**
+   * Rosie's latest line from while sound can't play, kept for when it can. Given to her voice, it would wait in a
+   * paused clip and play, out of turn, before her welcome.
+   */
+  let held: string | null = null;
   /** Rosie herself, riding in the jeep, who hops when a dinosaur is helped. */
   let rosieModel: DinoInstance | null = null;
   /** False when the stored park is from a newer version of the game, which this one mustn't overwrite. */
@@ -499,9 +504,15 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     if (!loaded) {
       return;
     }
-    if (!welcomed && mixer.running) {
-      welcomed = true;
-      say(welcomeLine(care));
+    if (mixer.running) {
+      if (!welcomed) {
+        welcomed = true;
+        say(welcomeLine(care));
+      }
+      if (held) {
+        say(held);
+        held = null;
+      }
     }
     const step = stepNeeds(care, PARK, { position: jeep.position, parked: jeep.route.length === 0 }, delta);
     care = step.care;
@@ -719,6 +730,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   const voices = loadVoices(mixer);
   const rosieVoice = createRosieVoice(mixer);
   function say(line: string): void {
+    if (!mixer.running) {
+      held = line;
+      return;
+    }
     rosieVoice.say(line);
     canvas.dataset.rosie = line;
   }

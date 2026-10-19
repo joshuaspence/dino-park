@@ -609,3 +609,30 @@ test('Rosie walks a new player through their first delivery', async ({ page }) =
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.done');
   await expect(canvas).toHaveAttribute('data-pointer', '');
 });
+
+test('Rosie holds what she has to say until sound starts', async ({ page }) => {
+  // A tablet keeps sound silent until the first tap, which headless browsers don't, so start it suspended here.
+  await page.addInitScript(() => {
+    const Original = window.AudioContext;
+    window.AudioContext = class extends Original {
+      constructor(options?: AudioContextOptions) {
+        super(options);
+        void this.suspend();
+      }
+    };
+  });
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+
+  // Steggy gets bored before the child's first tap, while the browser still keeps sound silent.
+  await playFor(page, 4000);
+  await expect(canvas).toHaveAttribute('data-needs', 'stegosaurus:bored');
+  await expect(canvas).not.toHaveAttribute('data-rosie');
+
+  // Once it starts, Rosie says hello, and then what she held back.
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need');
+});
