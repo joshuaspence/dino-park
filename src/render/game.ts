@@ -2,12 +2,14 @@ import * as THREE from 'three';
 
 import { type Jeep, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
+import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
 import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, speciesInPark } from '../core/species';
 import { type DinoInstance, loadDinoSkin } from './dinoSkin';
 import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
+import { loadPark, storePark } from '../storage/parkStore';
 import { buildPark } from './parkScene';
 
 export interface GameHandle {
@@ -113,6 +115,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   const herds = new Map<SpeciesId, DinoInstance[]>();
 
   let care = startCare(PARK);
+  /** Needs wait for the saved park, so nothing happens on a fresh park that's about to be replaced. */
+  let loaded = false;
+  /** False when the stored park is from a newer version of the game, which this one mustn't overwrite. */
+  let canSave = true;
   const bubbles = PARK.pens.map((pen) => {
     const bubble = new THREE.Sprite();
     bubble.position.set(pen.position.x, BUBBLE_HEIGHT, pen.position.z);
@@ -245,6 +251,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   let disposed = false;
 
   async function populate(): Promise<void> {
+    const saved = await loadPark();
+    care = resumeCare(PARK, saved === 'newer' ? null : saved);
+    canSave = saved !== 'newer';
+    loaded = true;
     const rosie = (await loadDinoSkin(ROSIE_MODEL)).create();
     const inPark = speciesInPark(care.eggsHatched);
     const residents = await Promise.all(
@@ -392,8 +402,15 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   }
 
   function updateCare(delta: number): void {
+    if (!loaded) {
+      return;
+    }
     const step = stepNeeds(care, PARK, { position: jeep.position, parked: jeep.route.length === 0 }, delta);
     care = step.care;
+    // Progress only changes on a delivery or a hatch, so that's when to save it.
+    if (canSave && step.events.some((event) => event.type === 'deliver' || event.type === 'hatch')) {
+      void storePark(savePark(care));
+    }
     for (const event of step.events) {
       if (event.type === 'deliver') {
         for (const dino of herds.get(event.species) ?? []) {
@@ -460,6 +477,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       .flatMap((resident) => (resident.need ? [`${resident.species}:${resident.need.kind}`] : []))
       .join(' ');
     canvas.dataset.cargo = care.cargo ?? '';
+    canvas.dataset.eggsHatched = String(care.eggsHatched);
   }
 
   const timer = new THREE.Timer();

@@ -27,7 +27,10 @@ the decision and the main reason for it. When the design changes, update this fi
   nothing.
 - Progress **autosaves constantly** to **IndexedDB**; the app calls `navigator.storage.persist()`.
 - Saved data carries a **schema version**; migrations live in `core/` and are unit-tested so an
-  update never wipes a park.
+  update never wipes a park. A save from a newer version is left untouched rather than
+  overwritten, and anything unreadable starts a fresh park instead of an error.
+- **Only progress is saved**: needs met and eggs hatched, written after every delivery and hatch.
+  Waiting needs and the jeep's load start afresh, since needs only advance while the game is open.
 - **M1:** one implicit profile. **M3:** sibling profiles chosen by picture (no names to type).
 
 ## 3. Core loop
@@ -203,6 +206,7 @@ Layout:
 src/core/     plain TS: needs, eggs, roads, pathfinding, jeep, save (no DOM, no three.js, no React)
 src/render/   three.js: scene, camera, models, effects
 src/audio/    mixer, voice lines
+src/storage/  the saved park in IndexedDB
 src/ui/       React overlays
 public/       models, audio, icons
 tests/e2e/    Playwright

@@ -10,6 +10,31 @@ async function playFor(page: Page, ms: number): Promise<void> {
   }
 }
 
+/**
+ * Reads or writes the saved park in idb-keyval's default database and store, which is where `storage/parkStore`
+ * keeps it under the key `park`.
+ */
+function savedPark(page: Page, write?: unknown): Promise<unknown> {
+  return page.evaluate(
+    (value) =>
+      new Promise((resolve, reject) => {
+        const open = indexedDB.open('keyval-store');
+        open.onupgradeneeded = () => open.result.createObjectStore('keyval');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const store = open.result.transaction('keyval', value === undefined ? 'readonly' : 'readwrite');
+          const request =
+            value === undefined
+              ? store.objectStore('keyval').get('park')
+              : store.objectStore('keyval').put(value, 'park');
+          request.onsuccess = () => resolve(value === undefined ? request.result : value);
+          request.onerror = () => reject(request.error);
+        };
+      }),
+    write,
+  );
+}
+
 test('loads the dinosaurs and animates them without errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -108,4 +133,33 @@ test('loads the toy shed when the jeep stops there', async ({ page }) => {
   await playFor(page, 6000);
   await expect(canvas).toHaveAttribute('data-moving', 'false');
   await expect(canvas).toHaveAttribute('data-cargo', 'toys');
+});
+
+test('saves a hatched egg and remembers it after a reload', async ({ page }) => {
+  // Loading three times plus driving to the nest takes a while in CI's software rendering.
+  test.slow();
+  await page.clock.install();
+  await page.goto('./');
+  // A park whose first egg is full, as if five needs had been met.
+  await savedPark(page, { version: 1, needsMet: 5, eggsHatched: 0 });
+  await page.reload();
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-eggs-hatched', '0');
+
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // The nest is up the cross road from where the jeep starts, just to its right.
+  await canvas.click({ position: { x: box.width * 0.57, y: box.height * 0.2 } });
+  await playFor(page, 8000);
+  await expect(canvas).toHaveAttribute('data-eggs-hatched', '1');
+  await expect.poll(() => savedPark(page)).toEqual({ version: 1, needsMet: 5, eggsHatched: 1 });
+
+  await page.reload();
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-eggs-hatched', '1');
 });
