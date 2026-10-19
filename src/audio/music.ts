@@ -23,9 +23,11 @@ export function startMusic(mixer: Mixer): { stop(): void } {
     if (context.state !== 'running' || !element.paused) {
       return;
     }
-    level.gain.setTargetAtTime(VOLUME, context.currentTime, FADE_IN_SECONDS / 3);
-    // Refused, most likely for want of a gesture yet: the next time sound starts tries again.
-    element.play().catch((error: unknown) => console.warn('Could not start the music', error));
+    // Refused, most likely for want of a gesture yet: the next time sound starts tries again, and fades in then.
+    element
+      .play()
+      .then(() => level.gain.setTargetAtTime(VOLUME, context.currentTime, FADE_IN_SECONDS / 3))
+      .catch((error: unknown) => console.warn('Could not start the music', error));
   };
   context.addEventListener('statechange', start);
   start();
