@@ -489,6 +489,20 @@ test('resets the park from the parent area, after asking', async ({ page }) => {
 
 test('stays asleep at bedtime until a grown-up wakes the park', async ({ page }) => {
   test.slow();
+  // Every line Rosie says, in order: `data-rosie` only keeps the latest.
+  await page.addInitScript(() => {
+    const said: string[] = [];
+    Object.assign(window, { said });
+    new MutationObserver((changes) => {
+      for (const change of changes) {
+        const line = (change.target as HTMLElement).dataset.rosie;
+        if (line) {
+          said.push(line);
+        }
+      }
+    }).observe(document, { attributes: true, attributeFilter: ['data-rosie'], subtree: true });
+  });
+  const said = () => page.evaluate(() => (window as unknown as { said: string[] }).said);
   await page.clock.install();
   await page.goto('./');
   await stored(page, 'settings', { volumes: { music: 1, effects: 1, voice: 1 }, bedtime: 10, asleep: true });
@@ -498,7 +512,8 @@ test('stays asleep at bedtime until a grown-up wakes the park', async ({ page })
   await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-asleep', 'true');
 
-  // Taps don't wake it or drive the jeep, and nobody asks for anything.
+  // Taps don't wake it or drive the jeep, nobody asks for anything, and Rosie doesn't greet anyone. The tap is also
+  // the gesture that lets sound start, so she would speak now if she were going to.
   const box = await canvas.boundingBox();
   if (!box) {
     throw new Error('Canvas has no size');
@@ -507,14 +522,20 @@ test('stays asleep at bedtime until a grown-up wakes the park', async ({ page })
   await playFor(page, 4000);
   await expect(canvas).toHaveAttribute('data-moving', 'false');
   await expect(canvas).toHaveAttribute('data-asleep', 'true');
+  await expect(canvas).not.toHaveAttribute('data-needs', /\w+:\w+/);
+  expect(await said()).toEqual([]);
 
-  // Nor does reloading.
+  // Nor does reloading, which opens the park asleep from the start rather than awake for a moment.
   await page.reload();
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-asleep', 'true');
+  await canvas.click({ position: { x: box.width * 0.25, y: box.height * 0.3 } });
+  await playFor(page, 4000);
+  await expect(canvas).not.toHaveAttribute('data-needs', /\w+:\w+/);
+  expect(await said()).toEqual([]);
 
-  // A grown-up wakes it, and the timer they chose is still set.
+  // A grown-up wakes it, and the timer they chose is still set. Rosie says good morning rather than welcome back.
   await openParentArea(page);
   await expect(page.getByRole('radio', { name: strings.bedtimeChoice(10) })).toBeChecked();
   await expect(page.getByText(strings.asleep)).toBeVisible();
@@ -523,6 +544,8 @@ test('stays asleep at bedtime until a grown-up wakes the park', async ({ page })
   await page.getByRole('button', { name: strings.close }).click();
   await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-asleep', 'false');
+  expect((await said())[0]).toBe('rosie.wake');
+  expect(await said()).not.toContain('rosie.welcome');
   expect(await stored(page, 'settings')).toMatchObject({ bedtime: 10, asleep: false });
   await canvas.click({ position: { x: box.width * 0.25, y: box.height * 0.3 } });
   await playFor(page, 300);

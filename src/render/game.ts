@@ -182,6 +182,8 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   let care = startCare(PARK);
   /** Needs wait for the saved park, so nothing happens on a fresh park that's about to be replaced. */
   let loaded = false;
+  /** False until the settings are known: until then the park holds still, as it may be asleep. */
+  let settingsKnown = false;
   let bedtimeMinutes: BedtimeMinutes = 0;
   let bedtime: Bedtime = AWAKE;
   /** 0 in daylight, 1 at full dusk. */
@@ -416,7 +418,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
 
   function driveTowards(target: Point): void {
     // A sleeping park stays still: taps, holds, keys and sticks all come through here.
-    if (bedtime.asleep) {
+    if (bedtime.asleep || !settingsKnown) {
       return;
     }
     // Plan on one graph throughout: road positions name edges by index.
@@ -541,11 +543,12 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   }
 
   function updateCare(delta: number): void {
-    if (!loaded) {
+    if (!loaded || !settingsKnown) {
       return;
     }
     if (mixer.running) {
-      if (!welcomed) {
+      // A sleeping park isn't greeted: waking it says good morning instead.
+      if (!welcomed && !bedtime.asleep) {
         welcomed = true;
         say(welcomeLine(care));
       }
@@ -809,7 +812,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   const [dayGround, duskGround] = [colour(DAY_SKY_LIGHT.ground), colour(DUSK_SKY_LIGHT.ground)];
   const [daySun, duskSun] = [colour(DAY_SUN.color), colour(DUSK_SUN.color)];
   function updateBedtime(delta: number): void {
-    if (loaded) {
+    if (loaded && settingsKnown) {
       const step = stepBedtime(bedtime, bedtimeMinutes, delta);
       bedtime = step.bedtime;
       if (step.fellAsleep) {
@@ -839,6 +842,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   return {
     honk,
     setBedtime(minutes, asleep) {
+      settingsKnown = true;
       bedtimeMinutes = minutes;
       if (asleep && !bedtime.asleep) {
         bedtime = { ...bedtime, asleep: true };
@@ -853,6 +857,8 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       }
       bedtime = wakeBedtime();
       music.setPlaying(true);
+      // Good morning is the greeting, so the one-time welcome doesn't follow it.
+      welcomed = true;
       say('rosie.wake');
     },
     dispose() {

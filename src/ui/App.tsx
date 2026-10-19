@@ -32,10 +32,6 @@ export function App() {
     void storeSettings(next);
   };
 
-  useEffect(() => {
-    void loadSettings().then(setSettings);
-  }, []);
-
   // Keep the game's bedtime timer in step with the settings, including a park that was asleep when it was closed.
   useEffect(() => {
     gameRef.current?.setBedtime(settings.bedtime, settings.asleep);
@@ -57,6 +53,8 @@ export function App() {
   const setBedtime = (minutes: BedtimeMinutes) => changeSettings({ ...settings, bedtime: minutes });
   const wake = () => {
     changeSettings({ ...settings, asleep: false });
+    // A grown-up's tap is a gesture, so good morning can be heard even if nobody has tapped the park yet.
+    mixerRef.current?.unlock();
     gameRef.current?.wake();
   };
 
@@ -73,10 +71,19 @@ export function App() {
     const game = startGame(canvasRef.current, mixer, {
       onAsleep: () => changeSettings({ ...settingsRef.current, asleep: true }),
     });
-    game.setBedtime(settingsRef.current.bedtime, settingsRef.current.asleep);
     gameRef.current = game;
     mixerRef.current = mixer;
+    // The park holds still until it knows its settings, so one that went to sleep never opens awake for a moment.
+    let cancelled = false;
+    void loadSettings().then((loaded) => {
+      if (!cancelled) {
+        settingsRef.current = loaded;
+        setSettings(loaded);
+        game.setBedtime(loaded.bedtime, loaded.asleep);
+      }
+    });
     return () => {
+      cancelled = true;
       gameRef.current = null;
       mixerRef.current = null;
       game.dispose();
