@@ -70,6 +70,9 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
     ['rosie.tutorial.done', `Hooray! You helped ${tutee.name}!`],
     ['rosie.egg.ready', "The egg's wobbling! Let's go to the nest!"],
     ['rosie.hatch.baby', 'Look, a baby dinosaur!'],
+    // The bedtime timer (docs/design.md §7): she yawns the park to sleep, and greets it when a grown-up wakes it.
+    ['rosie.bedtime', 'Yawn! The dinosaurs are sleepy. Goodnight, everyone! Sweet dreams!'],
+    ['rosie.wake', 'Good morning, dinosaurs! Rise and shine!'],
   ]);
   for (const species of SPECIES_SPOKEN_OF) {
     const { name, verb } = subject(species);

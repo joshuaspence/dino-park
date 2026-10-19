@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { playDeliver, playHatch, playHonk, playLoad, playNeed, startEngine } from '../audio/effects';
 import type { Mixer } from '../audio/mixer';
 import { startMusic } from '../audio/music';
+import { AWAKE, type Bedtime, type BedtimeMinutes, stepBedtime, wake as wakeBedtime } from '../core/bedtime';
 import { createRosieVoice } from '../audio/rosie';
 import { loadVoices } from '../audio/voices';
 import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
@@ -32,8 +33,36 @@ import { startSteering } from './steering';
 export interface GameHandle {
   /** Honks the jeep's horn, and the nearest dinosaur turns to look (docs/design.md §4). */
   honk(): void;
+  /**
+   * Sets the bedtime timer's length, and whether the park is already asleep, from the stored settings. A park that
+   * starts asleep is dark straight away, with no goodnight.
+   */
+  setBedtime(minutes: BedtimeMinutes, asleep: boolean): void;
+  /** A grown-up wakes the park: it brightens, the music comes back and the timer starts again. */
+  wake(): void;
   dispose(): void;
 }
+
+export interface GameHooks {
+  /** The bedtime timer ran out and the park fell asleep, so the settings should remember it. */
+  onAsleep(): void;
+}
+
+/** Day and dusk, which the park fades between as it goes to sleep and wakes (docs/design.md §7). */
+const DAY_SKY = 0x9fd8f5;
+const DUSK_SKY = 0x2c3768;
+/** The sky's light turns moonlit blue, and the low sun warm. */
+const DAY_SKY_LIGHT = { sky: 0xffffff, ground: 0x5a8f3c, intensity: 1.8 };
+const DUSK_SKY_LIGHT = { sky: 0x7d8fe0, ground: 0x1f2d4a, intensity: 1.1 };
+const DAY_SUN = { color: 0xffffff, intensity: 2 };
+const DUSK_SUN = { color: 0xff9a6b, intensity: 0.45 };
+/** A blue haze draws in at dusk, so the darkening shows even with the sky out of view. */
+const DAY_FOG = { near: 60, far: 120 };
+const DUSK_FOG = { near: 18, far: 75 };
+/** How quickly dusk falls and lifts (per second; about four seconds either way). */
+const DUSK_RATE = 0.8;
+/** Sleepy dinosaurs move at a fraction of their usual pace. */
+const SLEEPY_PACE = 0.3;
 
 /** Where the camera sits relative to the jeep. It keeps one compass direction, so tapped spots don't move. */
 const CAMERA_OFFSET = new THREE.Vector3(0, 24, 30);
@@ -109,19 +138,22 @@ function snapToDestination(point: Point): Point {
 }
 
 /** Starts the park: the jeep, its route trail, the dinosaurs in their pens, and touch/mouse input. */
-export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
+export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHooks): GameHandle {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x9fd8f5);
-  scene.fog = new THREE.Fog(0x9fd8f5, 60, 120);
+  const sky = new THREE.Color(DAY_SKY);
+  scene.background = sky;
+  const fog = new THREE.Fog(DAY_SKY, DAY_FOG.near, DAY_FOG.far);
+  scene.fog = fog;
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 200);
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x5a8f3c, 1.8));
-  const sun = new THREE.DirectionalLight(0xffffff, 2);
+  const skyLight = new THREE.HemisphereLight(DAY_SKY_LIGHT.sky, DAY_SKY_LIGHT.ground, DAY_SKY_LIGHT.intensity);
+  scene.add(skyLight);
+  const sun = new THREE.DirectionalLight(DAY_SUN.color, DAY_SUN.intensity);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30 });
@@ -150,6 +182,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   let care = startCare(PARK);
   /** Needs wait for the saved park, so nothing happens on a fresh park that's about to be replaced. */
   let loaded = false;
+  let bedtimeMinutes: BedtimeMinutes = 0;
+  let bedtime: Bedtime = AWAKE;
+  /** 0 in daylight, 1 at full dusk. */
+  let dusk = 0;
   /** Rosie says hello once, when the park has loaded and there's sound to hear her by. */
   let welcomed = false;
   /**
@@ -379,6 +415,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   }
 
   function driveTowards(target: Point): void {
+    // A sleeping park stays still: taps, holds, keys and sticks all come through here.
+    if (bedtime.asleep) {
+      return;
+    }
     // Plan on one graph throughout: road positions name edges by index.
     const roads = openRoads(PARK, care.eggsHatched);
     const from = nearestRoadPosition(roads, jeep.position);
@@ -513,6 +553,15 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
         say(held);
         held = null;
       }
+    }
+    if (bedtime.asleep) {
+      // Nothing is wanted while the park sleeps, and its pictures fade away with the light.
+      for (const bubble of bubbles) {
+        bubble.visible = false;
+      }
+      arrow.visible = false;
+      canvas.dataset.pointer = '';
+      return;
     }
     const step = stepNeeds(care, PARK, { position: jeep.position, parked: jeep.route.length === 0 }, delta);
     care = step.care;
@@ -668,6 +717,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     canvas.dataset.moving = String(jeep.route.length > 0);
     updateTrail();
     updateCare(delta);
+    updateBedtime(delta);
     updateLooking(delta);
 
     sun.position.set(jeep.position.x + 15, 30, jeep.position.z + 10);
@@ -675,7 +725,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     placeCamera(1 - Math.exp(-CAMERA_FOLLOW * delta), delta);
 
     for (const dino of dinos) {
-      dino.update(delta);
+      dino.update(delta * THREE.MathUtils.lerp(1, SLEEPY_PACE, dusk));
     }
     renderer.render(scene, camera);
   });
@@ -702,6 +752,9 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
 
   function honk(): void {
     mixer.unlock();
+    if (bedtime.asleep) {
+      return;
+    }
     playHonk(mixer);
     // Rosie rides in the jeep, so only dinosaurs standing in the park itself can turn to look, and not hatchlings
     // about to run to their pen, whose run sets their heading.
@@ -749,10 +802,56 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   const tutorialStation = PARK.stations.find((station) => station.kind === tutorialSupply);
   const tutorialPen = PARK.pens.find((pen) => pen.species === TUTORIAL_NEED.species);
   const music = startMusic(mixer);
+
+  const colour = (hex: number) => new THREE.Color(hex);
+  const [daySky, duskSky] = [colour(DAY_SKY), colour(DUSK_SKY)];
+  const [dayLight, duskLight] = [colour(DAY_SKY_LIGHT.sky), colour(DUSK_SKY_LIGHT.sky)];
+  const [dayGround, duskGround] = [colour(DAY_SKY_LIGHT.ground), colour(DUSK_SKY_LIGHT.ground)];
+  const [daySun, duskSun] = [colour(DAY_SUN.color), colour(DUSK_SUN.color)];
+  function updateBedtime(delta: number): void {
+    if (loaded) {
+      const step = stepBedtime(bedtime, bedtimeMinutes, delta);
+      bedtime = step.bedtime;
+      if (step.fellAsleep) {
+        say('rosie.bedtime');
+        music.setPlaying(false);
+        press = null;
+        hooks.onAsleep();
+      }
+    }
+    dusk = THREE.MathUtils.damp(dusk, bedtime.asleep ? 1 : 0, DUSK_RATE, delta);
+    const { lerp } = THREE.MathUtils;
+    sky.lerpColors(daySky, duskSky, dusk);
+    fog.color.copy(sky);
+    fog.near = lerp(DAY_FOG.near, DUSK_FOG.near, dusk);
+    fog.far = lerp(DAY_FOG.far, DUSK_FOG.far, dusk);
+    skyLight.color.lerpColors(dayLight, duskLight, dusk);
+    skyLight.groundColor.lerpColors(dayGround, duskGround, dusk);
+    skyLight.intensity = lerp(DAY_SKY_LIGHT.intensity, DUSK_SKY_LIGHT.intensity, dusk);
+    sun.color.lerpColors(daySun, duskSun, dusk);
+    sun.intensity = lerp(DAY_SUN.intensity, DUSK_SUN.intensity, dusk);
+    canvas.dataset.asleep = String(bedtime.asleep);
+  }
   let sinceSteer = HOLD_REPLAN_SECONDS;
 
   return {
     honk,
+    setBedtime(minutes, asleep) {
+      bedtimeMinutes = minutes;
+      if (asleep && !bedtime.asleep) {
+        bedtime = { ...bedtime, asleep: true };
+        dusk = 1;
+        music.setPlaying(false);
+      }
+    },
+    wake() {
+      if (!bedtime.asleep) {
+        return;
+      }
+      bedtime = wakeBedtime();
+      music.setPlaying(true);
+      say('rosie.wake');
+    },
     dispose() {
       disposed = true;
       steering.dispose();

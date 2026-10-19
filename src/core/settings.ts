@@ -1,3 +1,5 @@
+import { type BedtimeMinutes, isBedtimeMinutes } from './bedtime';
+
 /** The parent area's settings (docs/design.md §7), kept apart from the park so a reset leaves them alone. */
 export type Bus = 'music' | 'effects' | 'voice';
 
@@ -6,18 +8,34 @@ export const BUSES: readonly Bus[] = ['music', 'effects', 'voice'];
 export interface Settings {
   /** Each bus's volume, from 0 (silent) to 1 (full). */
   readonly volumes: Readonly<Record<Bus, number>>;
+  /** The bedtime timer's length in minutes; 0 is off. */
+  readonly bedtime: BedtimeMinutes;
+  /**
+   * Whether the park has gone to sleep. It's kept here rather than with the park so that neither a reload nor a park
+   * reset wakes it: only a grown-up can, from the parent area.
+   */
+  readonly asleep: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { volumes: { music: 1, effects: 1, voice: 1 } };
+export const DEFAULT_SETTINGS: Settings = {
+  volumes: { music: 1, effects: 1, voice: 1 },
+  bedtime: 0,
+  asleep: false,
+};
 
 /** Reads stored settings, never throwing: anything missing or malformed falls back to its default. */
 export function readSettings(stored: unknown): Settings {
-  const volumes = (typeof stored === 'object' && stored !== null && (stored as Record<string, unknown>).volumes) || {};
+  const fields = typeof stored === 'object' && stored !== null ? (stored as Record<string, unknown>) : {};
+  const volumes = fields.volumes || {};
   const volume = (bus: Bus) => {
     const value = (volumes as Record<string, unknown>)[bus];
     return typeof value === 'number' && Number.isFinite(value)
       ? Math.min(1, Math.max(0, value))
       : DEFAULT_SETTINGS.volumes[bus];
   };
-  return { volumes: { music: volume('music'), effects: volume('effects'), voice: volume('voice') } };
+  return {
+    volumes: { music: volume('music'), effects: volume('effects'), voice: volume('voice') },
+    bedtime: isBedtimeMinutes(fields.bedtime) ? fields.bedtime : DEFAULT_SETTINGS.bedtime,
+    asleep: fields.asleep === true,
+  };
 }

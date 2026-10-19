@@ -164,8 +164,12 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
 Behind a **grown-up gate** (hold for 3 seconds, then tap a named number):
 
 - volume sliders for music, effects and voice;
-- an optional **bedtime timer**: when it runs out, Rosie gets sleepy, says goodnight and puts the
-  park to bed (M2);
+- an optional **bedtime timer**, off by default or 10, 20 or 30 minutes. It counts only time the
+  game is on screen and starts again each time the game opens. When it runs out, Rosie yawns and
+  says goodnight, the park fades to dusk, the music fades out, the dinosaurs settle, and taps, the
+  horn and new needs all stop. **Only a grown-up can wake the park**, here: being asleep is kept
+  with the settings, so neither a reload nor a park reset wakes it. Waking it brightens the park,
+  brings the music back, has Rosie say good morning and starts the timer again;
 - reset the park, after a second named number;
 - version (`package.json`) and short git SHA.
 
