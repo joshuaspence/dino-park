@@ -643,7 +643,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       void storePark(savePark(care));
     }
     for (const event of step.events) {
-      sinceProgress = 0;
+      // A dinosaur asking for something isn't the child getting anywhere.
+      if (event.type !== 'need') {
+        sinceProgress = 0;
+      }
       if (event.type === 'deliver' || event.type === 'hatch') {
         helping = false;
       }

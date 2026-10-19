@@ -778,6 +778,10 @@ test("Rosie's picture wiggles when the player is stuck, and shows them what to d
   await expect(help).not.toHaveClass(/stuck/);
   await playFor(page, 21_000, async () => (await canvas.getAttribute('data-stuck')) === 'true');
   await expect(help).toHaveClass(/stuck/);
+  // Another dinosaur asking isn't progress: she keeps wiggling.
+  await playFor(page, 8000);
+  await expect(canvas).toHaveAttribute('data-needs', /^\w+:\w+ \w+:\w+$/);
+  await expect(help).toHaveClass(/stuck/);
 
   // Tapped, she names who wants what and the station to tap, and the arrow points at it until it's done.
   await help.click();
