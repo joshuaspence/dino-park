@@ -577,3 +577,69 @@ test('fades the music in even when its first play is refused', async ({ page }) 
   await expect.poll(levelSoon).toBeGreaterThan(0);
   expect(await levelSoon()).toBeLessThan(0.35);
 });
+
+test('Rosie walks a new player through their first delivery', async ({ page }) => {
+  // It plays about 15 s of game time, which CI's software-rendered WebKit takes 70–90 s over.
+  test.slow();
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  const tap = (x: number, y: number) => canvas.click({ position: { x: box.width * x, y: box.height * y } });
+
+  // The first tap lets sound start, and Rosie says hello; then Steggy gets bored, and an arrow shows the toy shed.
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await playFor(page, 4000);
+  await expect(canvas).toHaveAttribute('data-needs', 'stegosaurus:bored');
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need');
+  await expect(canvas).toHaveAttribute('data-pointer', 'station');
+
+  // The toy shed is just up and to the left of where the jeep starts.
+  await tap(0.36, 0.42);
+  await playFor(page, 6000);
+  await expect(canvas).toHaveAttribute('data-cargo', 'toys');
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.load');
+  await expect(canvas).toHaveAttribute('data-pointer', 'pen');
+
+  // Steggy's gate is along the road to the jeep's left.
+  await tap(0.31, 0.53);
+  await playFor(page, 5000);
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.done');
+  await expect(canvas).toHaveAttribute('data-pointer', '');
+});
+
+test('Rosie holds what she has to say until sound starts', async ({ page }) => {
+  // A tablet keeps sound silent until the first tap, which headless browsers don't. Report it suspended until the
+  // game resumes it, rather than suspending it for real: WebKit never finishes that, and goes to "interrupted".
+  await page.addInitScript(() => {
+    const Original = window.AudioContext;
+    const resumed = new WeakSet<AudioContext>();
+    window.AudioContext = class extends Original {
+      override get state(): AudioContextState {
+        return resumed.has(this) ? super.state : 'suspended';
+      }
+      override resume(): Promise<void> {
+        resumed.add(this);
+        return super.resume();
+      }
+    };
+  });
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+
+  // Steggy gets bored before the child's first tap, while the browser still keeps sound silent.
+  await playFor(page, 4000);
+  await expect(canvas).toHaveAttribute('data-needs', 'stegosaurus:bored');
+  await expect(canvas).not.toHaveAttribute('data-rosie');
+
+  // Once it starts, Rosie says hello, and then what she held back.
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.need');
+});

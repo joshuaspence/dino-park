@@ -9,8 +9,10 @@ import {
   NEEDS_PER_EGG,
   NEED_INTERVAL_SECONDS,
   SAD_SECONDS,
+  TUTORIAL_NEED,
   eggProgress,
   eggReady,
+  inTutorial,
   isSad,
   startCare,
   stepNeeds,
@@ -40,6 +42,9 @@ function atPen(species: SpeciesId, parked = true): JeepAt {
   }
   return { position: nearestRoadPosition(PARK.roads, penGate(pen)).point, parked };
 }
+
+/** A fresh park past the first-play tutorial, where the general rules for needs apply. */
+const played = (): Care => ({ ...startCare(PARK), needsMet: 1 });
 
 /** Steps `care` for `seconds` in one-second ticks with the jeep away from everything. */
 function wait(care: Care, seconds: number): Care {
@@ -72,7 +77,7 @@ describe('supplyFor', () => {
 
 describe('stepNeeds', () => {
   it('starts calm and gives a dinosaur its first need soon after', () => {
-    const care = startCare(PARK);
+    const care = played();
     expect(care.residents.every((resident) => resident.need === null)).toBe(true);
     expect(stepNeeds(care, PARK, away, FIRST_NEED_SECONDS - 1, first).events).toEqual([]);
     const { care: next, events } = stepNeeds(care, PARK, away, FIRST_NEED_SECONDS, first);
@@ -81,7 +86,7 @@ describe('stepNeeds', () => {
   });
 
   it('adds needs one interval apart, never more than a few at once', () => {
-    let care = wait(startCare(PARK), FIRST_NEED_SECONDS);
+    let care = wait(played(), FIRST_NEED_SECONDS);
     const waiting = () => care.residents.filter((resident) => resident.need).length;
     expect(waiting()).toBe(1);
     care = wait(care, NEED_INTERVAL_SECONDS - 1);
@@ -93,7 +98,7 @@ describe('stepNeeds', () => {
   });
 
   it('waits a full interval after a need is met in a full park', () => {
-    let care = wait(startCare(PARK), 100);
+    let care = wait(played(), 100);
     expect(care.residents.filter((resident) => resident.need).length).toBe(MAX_NEEDS);
     const helped = care.residents.findIndex((resident) => resident.need);
     const resident = care.residents[helped];
@@ -102,8 +107,9 @@ describe('stepNeeds', () => {
       throw new Error('Nobody is waiting');
     }
     const cargo = supplyFor(need.kind, resident.species);
+    const metBefore = care.needsMet;
     care = stepNeeds({ ...care, cargo }, PARK, atPen(resident.species), 0.1, first).care;
-    expect(care.needsMet).toBe(1);
+    expect(care.needsMet).toBe(metBefore + 1);
     care = wait(care, NEED_INTERVAL_SECONDS - 1);
     expect(care.residents.filter((other) => other.need).length).toBe(MAX_NEEDS - 1);
     care = wait(care, 1);
@@ -111,7 +117,7 @@ describe('stepNeeds', () => {
   });
 
   it('lets a need grow sad but never go away on its own', () => {
-    let care = wait(startCare(PARK), FIRST_NEED_SECONDS);
+    let care = wait(played(), FIRST_NEED_SECONDS);
     const sad = () => {
       const need = care.residents[0]?.need;
       return need ? isSad(need) : undefined;
@@ -161,18 +167,39 @@ describe('stepNeeds', () => {
     expect(PARK.pens.at(-1)?.species).toBe(PARK.areas[0]?.species);
     const lockedNeed = (care: Care) => care.residents.at(-1)?.need ?? null;
 
-    let care = startCare(PARK);
+    let care = played();
     for (let t = 0; t < 10 * NEED_INTERVAL_SECONDS; t++) {
       care = stepNeeds(care, PARK, away, 1, last).care;
     }
     expect(lockedNeed(care)).toBeNull();
 
-    const hatched = stepNeeds({ ...startCare(PARK), eggsHatched: 1 }, PARK, away, FIRST_NEED_SECONDS, last).care;
+    const hatched = stepNeeds({ ...played(), eggsHatched: 1 }, PARK, away, FIRST_NEED_SECONDS, last).care;
     expect(lockedNeed(hatched)).not.toBeNull();
   });
 
+  it('starts with the tutorial: only one dinosaur wants anything, and always the same thing, until a need is met', () => {
+    // Whatever the dice say, the first need is the tutorial's.
+    const last = () => 0.999;
+    let care = stepNeeds(startCare(PARK), PARK, away, FIRST_NEED_SECONDS, last).care;
+    const tutee = () => care.residents.find((resident) => resident.species === TUTORIAL_NEED.species);
+    expect(inTutorial(care)).toBe(true);
+    expect(tutee()?.need?.kind).toBe(TUTORIAL_NEED.kind);
+    // However long she waits, nobody else asks for anything.
+    for (let t = 0; t < 10 * NEED_INTERVAL_SECONDS; t++) {
+      care = stepNeeds(care, PARK, away, 1, last).care;
+    }
+    expect(care.residents.filter((resident) => resident.need)).toHaveLength(1);
+
+    // Once it's helped, the tutorial is over and the usual rules apply.
+    const cargo = supplyFor(TUTORIAL_NEED.kind, TUTORIAL_NEED.species);
+    care = stepNeeds({ ...care, cargo }, PARK, atPen(TUTORIAL_NEED.species), 0.1, last).care;
+    expect(inTutorial(care)).toBe(false);
+    care = wait(care, NEED_INTERVAL_SECONDS * 3);
+    expect(care.residents.filter((resident) => resident.need)).toHaveLength(MAX_NEEDS);
+  });
+
   it("doesn't give a celebrating dinosaur a new need", () => {
-    const start = startCare(PARK);
+    const start = played();
     const care: Care = {
       ...start,
       residents: start.residents.map((resident, i) => (i === 0 ? { ...resident, happyFor: HAPPY_SECONDS } : resident)),

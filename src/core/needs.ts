@@ -19,6 +19,14 @@ export const SAD_SECONDS = 40;
 export const HAPPY_SECONDS = 3;
 /** Needs met per egg: about five minutes of play (docs/design.md §5). */
 export const NEEDS_PER_EGG = 5;
+/**
+ * The first-play tutorial's one need: Steggy wants a toy. Her pen and the toy shed are both in view from where the
+ * jeep starts, so the child can see everything the tutorial asks them to tap.
+ */
+export const TUTORIAL_NEED = { species: 'stegosaurus', kind: 'bored' } as const satisfies {
+  species: SpeciesId;
+  kind: NeedKind;
+};
 
 export interface Need {
   readonly kind: NeedKind;
@@ -119,8 +127,10 @@ export function stepNeeds(
   }));
   let { cargo, needsMet, eggsHatched } = care;
 
-  // While the park is full the countdown waits, so meeting a need brings a calm gap rather than a new demand.
-  const full = residents.filter((resident) => resident.need).length >= MAX_NEEDS;
+  // While the park is full the countdown waits, so meeting a need brings a calm gap rather than a new demand. Until the
+  // first need is met, the first-play tutorial keeps it to one at a time.
+  const tutorial = inTutorial(care);
+  const full = residents.filter((resident) => resident.need).length >= (tutorial ? 1 : MAX_NEEDS);
   let untilNextNeed = full ? NEED_INTERVAL_SECONDS : care.untilNextNeed - seconds;
   if (untilNextNeed <= 0) {
     // A dinosaur still waiting to hatch can't want anything yet.
@@ -129,8 +139,9 @@ export function stepNeeds(
       (resident) => inPark.includes(resident.species) && !resident.need && resident.happyFor === 0,
     );
     if (calm.length > 0) {
-      const chosen = pick(calm, random);
-      const kind = pick(NEED_KINDS, random);
+      const tutee = tutorial ? calm.find((resident) => resident.species === TUTORIAL_NEED.species) : undefined;
+      const chosen = tutee ?? pick(calm, random);
+      const kind = tutee ? TUTORIAL_NEED.kind : pick(NEED_KINDS, random);
       residents = residents.map((resident) =>
         resident === chosen ? { ...resident, need: { kind, age: 0 } } : resident,
       );
@@ -187,6 +198,23 @@ export function visitedPlace(park: Park, position: Point): Visit | undefined {
   }
   consider(park.nest, { nest: true });
   return best;
+}
+
+/** True during the first-play tutorial (docs/design.md §6), which lasts until the first need is met. */
+export function inTutorial(care: Care): boolean {
+  return care.needsMet === 0;
+}
+
+/**
+ * What the tutorial has the child tap next: the station with the tutorial's supply, the dinosaur once it's on the
+ * jeep, or null when there's nothing to tap, before the dinosaur asks or once the tutorial is over.
+ */
+export function tutorialStep(care: Care): 'station' | 'pen' | null {
+  const tutee = care.residents.find((resident) => resident.species === TUTORIAL_NEED.species);
+  if (!inTutorial(care) || !tutee?.need) {
+    return null;
+  }
+  return care.cargo === supplyFor(TUTORIAL_NEED.kind, TUTORIAL_NEED.species) ? 'pen' : 'station';
 }
 
 /** True once a need has waited long enough to show a sad face. */

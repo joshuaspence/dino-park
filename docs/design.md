@@ -137,9 +137,18 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   (Because Rosie is a Parasaurolophus, it is not in the unlock list.)
 - The **child is the driver**: a small helmeted figure in the jeep. Choosing the jeep colour is the
   only customisation (M3).
-- **Voice lines** are keyed by ID (`rosie.need.trixie.hungry` → audio file). M1 uses
+- **Voice lines** are keyed by ID (`rosie.need.triceratops.hungry` → audio file). M1 uses
   **text-to-speech clips generated once at build time and committed**, so every device sounds the
-  same; recorded voices can replace them later through the same mapping.
+  same; recorded voices can replace them later through the same mapping. The lines are built in
+  `core/rosie.ts` from the dinosaurs' names, so a new species gets its lines without new text, and
+  `scripts/generate-rosie.ts` records them with **Piper**, in an **American English** voice: Piper
+  has no Australian one. The game finds the recordings at build time and stays silent for any line
+  without one.
+- **The first-play tutorial** lasts until the first need is met. Only **Steggy** wants anything,
+  and she's bored: Rosie says "Steggy is bored! Tap the toy shed!", a bobbing arrow points at the
+  toy shed, then at Steggy's gate once the toy is on the jeep, and Rosie cheers the delivery. Her
+  pen and the toy shed are both in view from where the jeep starts, so the child can see
+  everything the tutorial asks them to tap.
 - **Each dinosaur has its own voice** (roar, chirp, honk) for wanting something, being helped and
   sleeping, so children can hear who needs help.
 - **Gentle looping background music**, plus sound effects. Most effects (honk, engine, chimes,
