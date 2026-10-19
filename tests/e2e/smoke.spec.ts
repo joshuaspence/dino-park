@@ -206,3 +206,29 @@ test('drives with the arrow keys and honks with Space', async ({ page }) => {
   await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-looking', 'true');
 });
+
+test('draws the camera in on a hatch, then back to the jeep', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  await savedPark(page, { version: 1, needsMet: 5, eggsHatched: 0 });
+  await page.reload();
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-spotlight', 'false');
+
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // The nest is up the cross road from where the jeep starts, just to its right.
+  await canvas.click({ position: { x: box.width * 0.57, y: box.height * 0.2 } });
+  // Drive there in short steps and stop the moment it hatches, since the spotlight only lasts a couple of seconds.
+  for (let played = 0; played < 10_000 && (await canvas.getAttribute('data-eggs-hatched')) !== '1'; played += 200) {
+    await playFor(page, 200);
+  }
+  await expect(canvas).toHaveAttribute('data-eggs-hatched', '1');
+  await expect(canvas).toHaveAttribute('data-spotlight', 'true');
+  await playFor(page, 3000);
+  await expect(canvas).toHaveAttribute('data-spotlight', 'false');
+});

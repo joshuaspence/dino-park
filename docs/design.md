@@ -85,9 +85,10 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   compass direction on screen, which the fixed camera keeps steady: the jeep drives along the roads
   towards a point a little ahead that way, like a held finger. Space/H or the A button honks.
 - **Automatic follow camera:** third-person, above and behind the jeep, pulling back slightly while
-  driving and zooming in on the dinosaur during a delivery. The child never controls the camera. It
-  keeps **one compass direction** rather than swinging round behind the jeep at every turn, so a spot
-  the child is about to tap never slides away under their finger.
+  driving and zooming in on the dinosaur during a delivery, and on the nest when an egg hatches,
+  for a couple of seconds. The child never controls the camera. It keeps **one compass direction**
+  rather than swinging round behind the jeep at every turn, so a spot the child is about to tap
+  never slides away under their finger.
 
 ## 5. The park and its dinosaurs
 
