@@ -169,7 +169,8 @@ Behind a **grown-up gate** (hold for 3 seconds, then tap a named number):
   life** next to the jeep (a T. rex is about 7.7 m long) because big, readable animals matter more
   to small children than true scale. Recolours are keyed by the pack's
   material names. **Pterodactyl and Ankylosaurus have no model yet**: find one before M2, otherwise
-  build them procedurally.
+  build them procedurally. Until then their eggs, like any egg after everything has hatched, bring
+  out a half-size baby of a launch dinosaur, so an egg is never empty.
 
 ## 9. Tech stack
 

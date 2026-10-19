@@ -4,7 +4,7 @@ import { type Jeep, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
 import { PARK, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition } from '../core/roads';
-import { ROSIE_MODEL, SPECIES, type SpeciesId } from '../core/species';
+import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId } from '../core/species';
 import { type DinoInstance, loadDinoSkin } from './dinoSkin';
 import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
@@ -37,8 +37,12 @@ const EGG_START_SIZE = 0.6;
 const EGG_FULL_SIZE = 1.5;
 const SHELL_SECONDS = 1.2;
 
-/** The spots worth driving to: pen gates and stations. */
-const DESTINATIONS: Point[] = [...PARK.pens.map(penGate), ...PARK.stations.map((station) => station.position)];
+/** The spots worth driving to: pen gates, stations and the nest. */
+const DESTINATIONS: Point[] = [
+  ...PARK.pens.map(penGate),
+  ...PARK.stations.map((station) => station.position),
+  PARK.nest,
+];
 
 function snapToDestination(point: Point): Point {
   let best = point;
@@ -139,24 +143,34 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       shells.push({ mesh: half, velocity: new THREE.Vector3(side * 3, 6, 1.5), age: 0 });
       scene.add(half);
     }
+    // An egg always brings out a dinosaur. One whose species has no model yet, or that comes after everything has
+    // hatched, is a half-size baby of a launch dinosaur instead (docs/design.md §5).
     const model = species && SPECIES[species].model;
-    if (!species || !model) {
+    const babyModels = LAUNCH_SPECIES.flatMap((id) => SPECIES[id].model ?? []);
+    const standIn = model ? null : (babyModels[Math.floor(Math.random() * babyModels.length)] ?? null);
+    const hatchling = model ?? standIn;
+    if (!hatchling) {
       return;
     }
-    const skin = await loadDinoSkin(model);
+    const skin = await loadDinoSkin(hatchling);
     if (disposed) {
       return;
     }
     // The hatchlings wait by the nest until their own area opens.
-    const herdSize = SPECIES[species].herdSize;
+    const row = hatchlingRows++;
+    const herdSize = species && model ? SPECIES[species].herdSize : 1;
     for (let i = 0; i < herdSize; i++) {
       const dino = skin.create();
-      dino.object.position.set(PARK.nest.x + 3 + i * 2, 0, PARK.nest.z + 3);
+      if (standIn) {
+        dino.object.scale.multiplyScalar(0.5);
+      }
+      dino.object.position.set(PARK.nest.x + 3 + i * 2, 0, PARK.nest.z + 3 + row * 2.5);
       scene.add(dino.object);
       dino.play('jump');
       dinos.push(dino);
     }
   }
+  let hatchlingRows = 0;
   let disposed = false;
 
   async function populate(): Promise<void> {
