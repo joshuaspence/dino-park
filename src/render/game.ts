@@ -2,9 +2,9 @@ import * as THREE from 'three';
 
 import { type Jeep, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
-import { PARK, penGate } from '../core/park';
+import { PARK, type Pen, openRoads, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition } from '../core/roads';
-import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId } from '../core/species';
+import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, speciesInPark } from '../core/species';
 import { type DinoInstance, loadDinoSkin } from './dinoSkin';
 import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
@@ -40,6 +40,10 @@ const SHELL_SECONDS = 1.2;
 const HATCHLING_SPOTS = 7;
 const HATCHLING_RING = 4.5;
 const HATCHLING_ARC = (2 * Math.PI) / 5;
+/** How long hatchlings with a pen of their own celebrate by the nest before moving into it. */
+const HATCH_CELEBRATION_SECONDS = 4;
+/** How quickly an opening gate swings (per second; higher is snappier). */
+const GATE_SWING = 2;
 
 function hatchlingSpot(index: number): Point {
   const angle = ((index % HATCHLING_SPOTS) / (HATCHLING_SPOTS - 1) - 0.5) * 2 * HATCHLING_ARC;
@@ -165,8 +169,8 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
     if (disposed) {
       return;
     }
-    // The hatchlings wait by the nest until their own area opens.
     const herdSize = species && model ? SPECIES[species].herdSize : 1;
+    const herd: DinoInstance[] = [];
     for (let i = 0; i < herdSize; i++) {
       const dino = skin.create();
       if (standIn) {
@@ -178,18 +182,37 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       scene.add(dino.object);
       dino.play('jump');
       dinos.push(dino);
+      herd.push(dino);
+    }
+    // A species with a pen moves in once it has celebrated; a stand-in baby stays by the nest.
+    const pen = species && model ? PARK.pens.find((candidate) => candidate.species === species) : undefined;
+    if (pen) {
+      moves.push({ pen, herd, after: HATCH_CELEBRATION_SECONDS });
     }
   }
   let hatchlings = 0;
+  const moves: { pen: Pen; herd: DinoInstance[]; after: number }[] = [];
+
+  function moveIntoPen(pen: Pen, herd: DinoInstance[]): void {
+    herd.forEach((dino, i) => {
+      dino.object.position.set(pen.position.x + (i - (herd.length - 1) / 2) * 2.5, 0, pen.position.z);
+      // Three-quarter view towards the camera, so each silhouette is easy to recognise.
+      dino.object.rotation.y = pen.position.x < 0 ? 0.7 : -0.7;
+    });
+    herds.set(pen.species, herd);
+  }
   let disposed = false;
 
   async function populate(): Promise<void> {
     const rosie = (await loadDinoSkin(ROSIE_MODEL)).create();
+    const inPark = speciesInPark(care.eggsHatched);
     const residents = await Promise.all(
-      PARK.pens.map(async (pen) => {
-        const model = SPECIES[pen.species].model;
-        return { pen, skin: model ? await loadDinoSkin(model) : null };
-      }),
+      PARK.pens
+        .filter((pen) => inPark.includes(pen.species))
+        .map(async (pen) => {
+          const model = SPECIES[pen.species].model;
+          return { pen, skin: model ? await loadDinoSkin(model) : null };
+        }),
     );
     if (disposed) {
       return;
@@ -204,18 +227,12 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       if (!skin) {
         continue;
       }
-      const herdSize = SPECIES[pen.species].herdSize;
-      const herd: DinoInstance[] = [];
-      herds.set(pen.species, herd);
-      for (let i = 0; i < herdSize; i++) {
-        const dino = skin.create();
-        dino.object.position.set(pen.position.x + (i - (herdSize - 1) / 2) * 2.5, 0, pen.position.z);
-        // Three-quarter view towards the camera, so each silhouette is easy to recognise.
-        dino.object.rotation.y = pen.position.x < 0 ? 0.7 : -0.7;
+      const herd = Array.from({ length: SPECIES[pen.species].herdSize }, () => skin.create());
+      for (const dino of herd) {
         scene.add(dino.object);
         dinos.push(dino);
-        herd.push(dino);
       }
+      moveIntoPen(pen, herd);
     }
     canvas.dataset.ready = 'true';
   }
@@ -235,9 +252,11 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   }
 
   function driveTowards(target: Point): void {
-    const from = nearestRoadPosition(PARK.roads, jeep.position);
-    const to = nearestRoadPosition(PARK.roads, target);
-    jeep = driveAlong(jeep, findRoute(PARK.roads, from, to));
+    // Plan on one graph throughout: road positions name edges by index.
+    const roads = openRoads(PARK, care.eggsHatched);
+    const from = nearestRoadPosition(roads, jeep.position);
+    const to = nearestRoadPosition(roads, target);
+    jeep = driveAlong(jeep, findRoute(roads, from, to));
   }
 
   let press: { id: number; x: number; y: number; at: number; holding: boolean } | null = null;
@@ -376,6 +395,25 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       scene.remove(shell.mesh);
       shell.mesh.geometry.dispose();
       shells.splice(shells.indexOf(shell), 1);
+    }
+
+    for (const move of moves) {
+      move.after -= delta;
+      if (move.after <= 0) {
+        moveIntoPen(move.pen, move.herd);
+      }
+    }
+    moves.splice(0, moves.length, ...moves.filter((move) => move.after > 0));
+
+    const inPark = speciesInPark(care.eggsHatched);
+    for (const area of PARK.areas) {
+      const open = inPark.includes(area.species);
+      park.getObjectByName(`gate-${area.species}`)?.traverse((part) => {
+        if (part.name === 'gate-leaf') {
+          const target = open ? (part.userData.side as number) * (Math.PI / 2) : 0;
+          part.rotation.y = THREE.MathUtils.damp(part.rotation.y, target, GATE_SWING, delta);
+        }
+      });
     }
 
     cargo.visible = care.cargo !== null;

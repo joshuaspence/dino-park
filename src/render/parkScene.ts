@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { type Park, type Pen, ROAD_WIDTH, type StationKind, penGate } from '../core/park';
+import { type Area, type Park, type Pen, ROAD_WIDTH, type StationKind, penGate } from '../core/park';
 import { distance } from '../core/roads';
 
 /** Cached flat-shaded materials by colour, so the park shares a handful of materials. */
@@ -26,7 +26,8 @@ function buildRoads(park: Park): THREE.Group {
   const group = new THREE.Group();
   group.name = 'roads';
   const tarmac = 0xe8d5a3;
-  for (const [a, b] of park.roads.edges) {
+  // Every road, open or not: an area's road is in view behind its closed gate.
+  for (const [a, b] of [...park.roads.edges, ...park.areas.flatMap((area) => area.edges)]) {
     const from = park.roads.nodes.get(a);
     const to = park.roads.nodes.get(b);
     if (!from || !to) {
@@ -97,6 +98,36 @@ function buildPen(pen: Pen): THREE.Group {
       }
     }
   });
+  return group;
+}
+
+/**
+ * A two-leaf gate across the road into `area`, closed. Each leaf hangs from a pivot named `gate-leaf`, which swings
+ * it a quarter turn into the area to open it.
+ */
+function buildGate(park: Park, area: Area): THREE.Group {
+  const group = new THREE.Group();
+  group.name = `gate-${area.species}`;
+  group.position.set(area.gate.x, 0, area.gate.z);
+  const [a, b] = area.edges[0] ?? [];
+  const from = a === undefined ? undefined : park.roads.nodes.get(a);
+  const to = b === undefined ? undefined : park.roads.nodes.get(b);
+  if (from && to) {
+    // Local +z points along the road into the area.
+    group.rotation.y = Math.atan2(to.x - from.x, to.z - from.z);
+  }
+  const half = ROAD_WIDTH / 2;
+  for (const side of [-1, 1]) {
+    group.add(mesh(new THREE.BoxGeometry(0.4, 2.2, 0.4), 0x8a5a32, side * (half + 0.3), 1.1, 0));
+    const pivot = new THREE.Group();
+    pivot.name = 'gate-leaf';
+    pivot.position.set(side * half, 0, 0);
+    pivot.userData.side = side;
+    for (const y of [0.6, 1.4]) {
+      pivot.add(mesh(new THREE.BoxGeometry(half, 0.25, 0.15), 0xffd84a, -side * (half / 2), y, 0));
+    }
+    group.add(pivot);
+  }
   return group;
 }
 
@@ -180,6 +211,9 @@ export function buildPark(park: Park): THREE.Group {
   group.add(buildRoads(park));
   for (const pen of park.pens) {
     group.add(buildPen(pen));
+  }
+  for (const area of park.areas) {
+    group.add(buildGate(park, area));
   }
   const nest = buildNest();
   nest.position.set(park.nest.x, 0, park.nest.z);
