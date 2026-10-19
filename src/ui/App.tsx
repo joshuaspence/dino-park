@@ -1,7 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { type Mixer, createMixer } from '../audio/mixer';
+import { startCare } from '../core/needs';
+import { PARK } from '../core/park';
+import { savePark } from '../core/save';
+import { type Bus, DEFAULT_SETTINGS, type Settings } from '../core/settings';
 import { type GameHandle, startGame } from '../render/game';
+import { loadSettings, storePark, storeSettings } from '../storage/parkStore';
+import { ParentArea } from './ParentArea';
 import { supportsWebGL2 } from '../render/webgl';
 import { strings } from './strings';
 
@@ -11,7 +17,33 @@ export function App() {
   const mixerRef = useRef<Mixer | null>(null);
   /** Whether the current press on the honk button has already honked. */
   const honked = useRef(false);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const webgl2 = supportsWebGL2();
+
+  useEffect(() => {
+    void loadSettings().then(setSettings);
+  }, []);
+
+  // Keep the mixer's buses at the parent area's volumes, including once the mixer is made.
+  useEffect(() => {
+    const mixer = mixerRef.current;
+    if (mixer) {
+      for (const [bus, volume] of Object.entries(settings.volumes) as [Bus, number][]) {
+        mixer.buses[bus].gain.value = volume;
+      }
+    }
+  });
+
+  const setVolume = (bus: Bus, volume: number) => {
+    const next = { ...settings, volumes: { ...settings.volumes, [bus]: volume } };
+    setSettings(next);
+    void storeSettings(next);
+  };
+
+  // Settings are stored apart from the park, so they survive this.
+  const resetPark = () => {
+    void storePark(savePark(startCare(PARK))).then(() => window.location.reload());
+  };
 
   useEffect(() => {
     if (!webgl2 || !canvasRef.current) {
@@ -85,6 +117,7 @@ export function App() {
         </span>
         <p>{strings.rotate}</p>
       </div>
+      <ParentArea settings={settings} onVolume={setVolume} onReset={resetPark} />
       <small className="build" data-testid="build">
         v{__APP_VERSION__} · {__GIT_SHA__}
       </small>

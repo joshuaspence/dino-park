@@ -1,5 +1,7 @@
 import { type Page, expect, test } from '@playwright/test';
 
+import { strings } from '../../src/ui/strings';
+
 /**
  * Plays `ms` of game time on a fake clock in 100 ms frames, the most the game steps in one frame. `runFor` would
  * render a frame every 16 ms, which CI's software rendering is far too slow for over several seconds.
@@ -354,4 +356,109 @@ test('a dinosaur calls out when it wants something', async ({ page }) => {
   // The call is a decoded recording, which the synthesised need pop isn't.
   const started = await page.evaluate(() => (window as unknown as { started: number[] }).started);
   expect(started.some((seconds) => seconds > 0.3)).toBe(true);
+});
+
+/** Opens the parent area as a grown-up would: holds the lock for 3 s, then taps the number named in words. */
+async function openParentArea(page: Page): Promise<void> {
+  const gate = page.getByRole('button', { name: strings.gate });
+  const box = await gate.boundingBox();
+  if (!box) {
+    throw new Error('The grown-up gate has no size');
+  }
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.clock.fastForward(3100);
+  await page.mouse.up();
+  const question = (await page.locator('#parent-ask').textContent()) ?? '';
+  const word = strings.numberWords.find((candidate) => question.includes(` ${candidate}.`));
+  if (!word) {
+    throw new Error(`No number named in "${question}"`);
+  }
+  await page.getByRole('button', { name: String(strings.numberWords.indexOf(word) + 1), exact: true }).click();
+  await expect(page.getByRole('heading', { name: strings.parentTitle })).toBeVisible();
+}
+
+test('keeps the parent area behind a hold and a number named in words', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  const gate = page.getByRole('button', { name: strings.gate });
+
+  // A tap, or a hold that isn't long enough, asks nothing.
+  await gate.click();
+  await page.clock.fastForward(3100);
+  await expect(page.locator('#parent-ask')).toHaveCount(0);
+
+  // A wrong number closes the gate again.
+  const box = await gate.boundingBox();
+  if (!box) {
+    throw new Error('The grown-up gate has no size');
+  }
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.clock.fastForward(3100);
+  await page.mouse.up();
+  const question = (await page.locator('#parent-ask').textContent()) ?? '';
+  const answer = strings.numberWords.findIndex((word) => question.includes(` ${word}.`)) + 1;
+  await page.getByRole('button', { name: String((answer % 9) + 1), exact: true }).click();
+  await expect(page.locator('#parent-ask')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: strings.parentTitle })).toHaveCount(0);
+
+  await openParentArea(page);
+  await expect(page.getByText(`${strings.version} `)).toContainText('0.0.0');
+});
+
+test('sets and remembers the volumes in the parent area', async ({ page }) => {
+  // The mixer's buses are the first three gains it makes, in the order music, effects, voice.
+  await page.addInitScript(() => {
+    const gains: GainNode[] = [];
+    Object.assign(window, { gains });
+    const create = AudioContext.prototype.createGain;
+    AudioContext.prototype.createGain = function (this: AudioContext) {
+      const gain = create.call(this);
+      gains.push(gain);
+      return gain;
+    };
+  });
+  const effectsGain = () => page.evaluate(() => (window as unknown as { gains: GainNode[] }).gains[1]?.gain.value);
+  await page.clock.install();
+  await page.goto('./');
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await openParentArea(page);
+  const effects = page.getByRole('slider', { name: strings.volumes.effects });
+  await expect(effects).toHaveValue('1');
+  await effects.focus();
+  await page.keyboard.press('Home');
+  await expect(effects).toHaveValue('0');
+  expect(await effectsGain()).toBe(0);
+
+  await page.reload();
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await openParentArea(page);
+  await expect(page.getByRole('slider', { name: strings.volumes.effects })).toHaveValue('0');
+  await expect(page.getByRole('slider', { name: strings.volumes.music })).toHaveValue('1');
+  expect(await effectsGain()).toBe(0);
+});
+
+test('resets the park from the parent area, after asking', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  await savedPark(page, { version: 1, needsMet: 7, eggsHatched: 1 });
+  await page.reload();
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-eggs-hatched', '1');
+
+  await openParentArea(page);
+  await page.getByRole('button', { name: strings.reset }).click();
+  // Changing your mind keeps the park.
+  await page.getByRole('button', { name: strings.resetNo }).click();
+  await page.getByRole('button', { name: strings.reset }).click();
+  await page.getByRole('button', { name: strings.resetYes }).click();
+
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-eggs-hatched', '0');
+  expect(await savedPark(page)).toEqual({ version: 1, needsMet: 0, eggsHatched: 0 });
 });

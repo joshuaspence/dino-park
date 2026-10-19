@@ -31,6 +31,7 @@ the decision and the main reason for it. When the design changes, update this fi
   overwritten, and anything unreadable starts a fresh park instead of an error.
 - **Only progress is saved**: needs met and eggs hatched, written after every delivery and hatch.
   Waiting needs and the jeep's load start afresh, since needs only advance while the game is open.
+  The parent area's volumes are saved separately, so resetting the park keeps them.
 - **M1:** one implicit profile. **M3:** sibling profiles chosen by picture (no names to type).
 
 ## 3. Core loop
@@ -153,8 +154,12 @@ Behind a **grown-up gate** (hold for 3 seconds, then tap a named number):
 - volume sliders for music, effects and voice;
 - an optional **bedtime timer**: when it runs out, Rosie gets sleepy, says goodnight and puts the
   park to bed (M2);
-- reset the park;
+- reset the park, after a confirmation;
 - version (`package.json`) and short git SHA.
+
+The gate is a small, faded lock in the top-left corner, out of a child's way, with a ring that fills
+during the hold. The number is named in words ("tap the number seven") over a shuffled grid of
+digits, so passing it takes reading; a wrong tap closes it, and each opening asks afresh.
 
 ## 8. Art and assets
 
