@@ -28,6 +28,9 @@ export interface Park {
 /** The farthest a pen or station's gate may be from the road it's reached by. */
 export const MAX_REACH = 12;
 
+/** How wide the tarmac is, in metres. */
+export const ROAD_WIDTH = 5;
+
 /**
  * The launch park: a rounded loop with a road across the middle. Pens sit outside the loop and stations
  * inside it, so every trip is a short drive. Coordinates are metres; −z is "north", away from the camera.

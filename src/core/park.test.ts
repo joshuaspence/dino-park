@@ -1,8 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import { MAX_REACH, PARK, penGate } from './park';
-import { findRoute, nearestRoadPosition } from './roads';
+import { MAX_REACH, PARK, type Pen, ROAD_WIDTH, penGate } from './park';
+import { type Point, findRoute, nearestRoadPosition } from './roads';
 import { LAUNCH_SPECIES } from './species';
+
+/** Points every half metre or so around a pen's fence line. */
+function fencePosts({ position, halfSize }: Pen): Point[] {
+  const posts: Point[] = [];
+  const steps = Math.ceil(4 * Math.max(halfSize.x, halfSize.z));
+  for (let i = 0; i <= steps; i++) {
+    const t = (2 * i) / steps - 1;
+    posts.push(
+      { x: position.x + t * halfSize.x, z: position.z - halfSize.z },
+      { x: position.x + t * halfSize.x, z: position.z + halfSize.z },
+      { x: position.x - halfSize.x, z: position.z + t * halfSize.z },
+      { x: position.x + halfSize.x, z: position.z + t * halfSize.z },
+    );
+  }
+  return posts;
+}
 
 describe('PARK', () => {
   it('only joins nodes that exist', () => {
@@ -39,11 +55,11 @@ describe('PARK', () => {
     }
   });
 
-  it('keeps pens off the roads', () => {
+  it('keeps pen fences off the roads', () => {
     for (const pen of PARK.pens) {
-      expect(nearestRoadPosition(PARK.roads, pen.position).distance).toBeGreaterThan(
-        Math.min(pen.halfSize.x, pen.halfSize.z),
-      );
+      for (const post of fencePosts(pen)) {
+        expect(nearestRoadPosition(PARK.roads, post).distance).toBeGreaterThan(ROAD_WIDTH / 2);
+      }
     }
   });
 });

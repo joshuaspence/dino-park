@@ -1,9 +1,7 @@
 import * as THREE from 'three';
 
-import { type Park, type Pen, type StationKind, penGate } from '../core/park';
+import { type Park, type Pen, ROAD_WIDTH, type StationKind, penGate } from '../core/park';
 import { distance } from '../core/roads';
-
-const ROAD_WIDTH = 5;
 
 /** Cached flat-shaded materials by colour, so the park shares a handful of materials. */
 const materials = new Map<number, THREE.MeshStandardMaterial>();
