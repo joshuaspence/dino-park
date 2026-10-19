@@ -3,12 +3,8 @@ import { type Page, expect, test } from '@playwright/test';
 /**
  * Plays `ms` of game time on a fake clock in 100 ms frames, the most the game steps in one frame. `runFor` would
  * render a frame every 16 ms, which CI's software rendering is far too slow for over several seconds.
- *
- * Even 100 ms frames add up there, so any test that plays game time gets the slow timeout: a test that needs it then
- * can't forget to ask.
  */
 async function playFor(page: Page, ms: number): Promise<void> {
-  test.slow();
   for (let played = 0; played < ms; played += 100) {
     await page.clock.fastForward(100);
   }
