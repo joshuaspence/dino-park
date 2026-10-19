@@ -6,8 +6,11 @@ import {
   HAPPY_SECONDS,
   type JeepAt,
   MAX_NEEDS,
+  NEEDS_PER_EGG,
   NEED_INTERVAL_SECONDS,
   SAD_SECONDS,
+  eggProgress,
+  eggReady,
   isSad,
   startCare,
   stepNeeds,
@@ -15,7 +18,7 @@ import {
 } from './needs';
 import { PARK, type StationKind, penGate } from './park';
 import { nearestRoadPosition } from './roads';
-import type { SpeciesId } from './species';
+import { type SpeciesId, UNLOCK_ORDER } from './species';
 
 /** Always picks the first choice: the first calm dinosaur, and the first kind of need (hungry). */
 const first = () => 0;
@@ -161,5 +164,46 @@ describe('stepNeeds', () => {
     };
     const { events } = stepNeeds(care, PARK, away, 0.1, first);
     expect(events).toEqual([{ type: 'need', species: PARK.pens[1]?.species, kind: 'hungry' }]);
+  });
+});
+
+describe('eggs', () => {
+  const atNest: JeepAt = { position: PARK.nest, parked: false };
+
+  it('fills an egg one need at a time', () => {
+    const care = startCare(PARK);
+    expect(eggProgress(care)).toBe(0);
+    expect(eggProgress({ ...care, needsMet: NEEDS_PER_EGG - 1 })).toBe(NEEDS_PER_EGG - 1);
+    expect(eggReady({ ...care, needsMet: NEEDS_PER_EGG - 1 })).toBe(false);
+    expect(eggReady({ ...care, needsMet: NEEDS_PER_EGG })).toBe(true);
+  });
+
+  it('hatches a ready egg into the next dinosaur when the jeep reaches the nest', () => {
+    const ready = { ...startCare(PARK), untilNextNeed: Infinity, needsMet: NEEDS_PER_EGG };
+    const { care, events } = stepNeeds(ready, PARK, atNest, 0.1, first);
+    expect(events).toEqual([{ type: 'hatch', species: UNLOCK_ORDER[0] }]);
+    expect(care.eggsHatched).toBe(1);
+    expect(eggProgress(care)).toBe(0);
+  });
+
+  it("doesn't hatch an egg that isn't ready", () => {
+    const filling = { ...startCare(PARK), untilNextNeed: Infinity, needsMet: NEEDS_PER_EGG - 1 };
+    expect(stepNeeds(filling, PARK, atNest, 0.1, first).events).toEqual([]);
+  });
+
+  it('counts needs met while an egg waits towards the next one', () => {
+    const waiting = { ...startCare(PARK), untilNextNeed: Infinity, needsMet: NEEDS_PER_EGG + 2 };
+    expect(eggProgress(stepNeeds(waiting, PARK, atNest, 0.1, first).care)).toBe(2);
+  });
+
+  it('hatches with no new species once every species has hatched', () => {
+    const hatched = UNLOCK_ORDER.length;
+    const ready = {
+      ...startCare(PARK),
+      untilNextNeed: Infinity,
+      eggsHatched: hatched,
+      needsMet: (hatched + 1) * NEEDS_PER_EGG,
+    };
+    expect(stepNeeds(ready, PARK, atNest, 0.1, first).events).toEqual([{ type: 'hatch', species: null }]);
   });
 });

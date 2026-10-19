@@ -21,6 +21,8 @@ export interface Park {
   readonly roads: RoadGraph;
   readonly pens: readonly Pen[];
   readonly stations: readonly Station[];
+  /** Where eggs wait to hatch, by the visitor centre. */
+  readonly nest: Point;
   /** Where the jeep starts, on a road. */
   readonly start: Point;
 }
@@ -86,6 +88,8 @@ export const PARK: Park = {
     { kind: 'toys', position: { x: -8, z: 18 } },
     { kind: 'vet', position: { x: 8, z: 18 } },
   ],
+  // Beside the junction at the middle of the park, which is the nest's road stop.
+  nest: { x: 6, z: 0 },
   start: { x: 0, z: 24 },
 };
 

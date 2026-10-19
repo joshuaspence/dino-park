@@ -52,10 +52,11 @@ describe('PARK', () => {
     }
   });
 
-  it('visits each station and pen from its road stop, even stopping a little short or long of it', () => {
+  it('visits each station, pen and the nest from its road stop, even stopping a little short or long of it', () => {
     const places = [
       ...PARK.stations.map((station) => ({ place: station.position, visit: { station } })),
       ...PARK.pens.map((pen) => ({ place: penGate(pen), visit: { pen } })),
+      { place: PARK.nest, visit: { nest: true } },
     ];
     for (const { place, visit } of places) {
       for (const stop of stopsNear(place)) {
