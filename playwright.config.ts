@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Overridable so two checkouts can each test their own build at once.
-const port = Number(process.env.PLAYWRIGHT_PORT ?? 4173);
+// Overridable so two checkouts can each test their own build at once; unset or empty means the default.
+const port = Number(process.env.PLAYWRIGHT_PORT || 4173);
 const url = `http://localhost:${port}/dino-park/`;
 
 // Landscape tablet viewport: the primary target (docs/design.md §10).
