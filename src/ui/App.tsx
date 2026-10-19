@@ -8,6 +8,8 @@ import type { BedtimeMinutes } from '../core/bedtime';
 import { type Bus, DEFAULT_SETTINGS, type Settings } from '../core/settings';
 import { type GameHandle, startGame } from '../render/game';
 import { loadSettings, storePark, storeSettings } from '../storage/parkStore';
+import type { Subject } from '../core/inspect';
+import { DinoCard } from './DinoCard';
 import { ParentArea } from './ParentArea';
 import { supportsWebGL2 } from '../render/webgl';
 import { strings } from './strings';
@@ -21,6 +23,8 @@ export function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   /** True when the child seems stuck, so the help button wiggles to show it's there. */
   const [stuck, setStuck] = useState(false);
+  /** What the open info card is about, if one is open. */
+  const [card, setCard] = useState<{ subject: Subject; game: GameHandle } | null>(null);
   /** The latest settings, which the game's callback and the parent area's changes build on. */
   const settingsRef = useRef(settings);
   useEffect(() => {
@@ -76,6 +80,7 @@ export function App() {
     const game = startGame(canvasRef.current, mixer, {
       onAsleep: () => changeSettings({ ...settingsRef.current, asleep: true }),
       onStuck: setStuck,
+      onInspect: (subject) => setCard(subject && { subject, game }),
     });
     gameRef.current = game;
     mixerRef.current = mixer;
@@ -173,6 +178,17 @@ export function App() {
           <ellipse cx="33" cy="24.5" rx="17" ry="3.5" fill="#b07a3c" />
         </svg>
       </button>
+      {card && (
+        <DinoCard
+          key={card.subject.dinosaur}
+          game={card.game}
+          species={card.subject.dinosaur}
+          onClose={() => {
+            card.game.closeCard();
+            setCard(null);
+          }}
+        />
+      )}
       <div className="notice rotate-prompt" aria-live="polite">
         <span className="notice-picture" aria-hidden="true">
           📱↻

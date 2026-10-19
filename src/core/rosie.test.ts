@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { type Care, type CareEvent, NEEDS_PER_EGG, NEED_KINDS, startCare } from './needs';
 import { PARK, type StationKind } from './park';
-import { rosieLines, rosieSays, welcomeLine } from './rosie';
+import { rosieAbout, rosieLines, rosieSays, welcomeLine } from './rosie';
 import { LAUNCH_SPECIES, type SpeciesId, UNLOCK_ORDER } from './species';
 
 const fresh = startCare(PARK);
@@ -105,5 +105,36 @@ describe('Ranger Rosie', () => {
     expect(said({ type: 'hatch', species: 'pterodactyl' }, played)).toEqual(['rosie.hatch.baby']);
     expect(said({ type: 'hatch', species: null }, played)).toEqual(['rosie.hatch.baby']);
     expect(welcomeLine(played)).toBe('rosie.welcome-back');
+  });
+
+  it('introduces a dinosaur on its card, says how it feels, and tells a fact in turn', () => {
+    const lines = rosieLines();
+    const rex = played.residents.find((resident) => resident.species === 'trex');
+    if (!rex) {
+      throw new Error('No Rex');
+    }
+    const happy = { ...rex, happyFor: 1 };
+    expect(rosieAbout(happy, 0).map((beat) => beat.line)).toEqual([
+      'rosie.about.trex',
+      'rosie.mood.trex.happy',
+      'rosie.fact.trex.0',
+    ]);
+    // Wanting something, she says what; the facts count round.
+    const hungry = { ...rex, need: { kind: 'hungry' as const, age: 0 } };
+    expect(rosieAbout(hungry, 4).map((beat) => beat.line)).toEqual([
+      'rosie.about.trex',
+      'rosie.need.trex.hungry',
+      'rosie.fact.trex.1',
+    ]);
+    expect(lines.get('rosie.about.trex')).toBe('This is Rex! Rex is a Tyrannosaurus rex.');
+    expect(lines.get('rosie.about.velociraptor')).toBe('These are the Raptors! The Raptors are Velociraptors.');
+    for (const species of [...LAUNCH_SPECIES, ...UNLOCK_ORDER]) {
+      const resident = { ...rex, species, levels: { ...rex.levels, dirty: 0.55 } };
+      for (let fact = 0; fact < 3; fact++) {
+        for (const { line } of rosieAbout(resident, fact)) {
+          expect(lines.get(line), line).toBeTruthy();
+        }
+      }
+    }
   });
 });

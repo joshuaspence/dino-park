@@ -754,6 +754,61 @@ test('Rosie walks a new player through their first delivery, showing them each p
   ]);
 });
 
+test('a double tap on a dinosaur opens its card, which Rosie reads aloud', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  // Past the guided tour.
+  await savedPark(page, { version: 1, needsMet: 2, eggsHatched: 0 });
+  await page.reload();
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // Rex's pen is down and to the right of where the jeep starts.
+  const rex = { x: box.width * 0.85, y: box.height * 0.75 };
+  const card = page.getByRole('region', { name: strings.cardTitle('Rex') });
+
+  // A single tap drives, as always, and opens nothing.
+  await canvas.click({ position: rex });
+  await playFor(page, 1000);
+  await expect(card).toBeHidden();
+
+  await canvas.dblclick({ position: rex });
+  await playFor(page, 200);
+  await expect(card).toBeVisible();
+  await expect(canvas).toHaveAttribute('data-inspecting', 'trex');
+  await expect(canvas).toHaveAttribute('data-spotlight', 'true');
+  await expect(card.getByText('Tyrannosaurus rex', { exact: true })).toBeVisible();
+  await expect(card.getByRole('meter')).toHaveCount(5);
+  // Rosie says who it is, how it feels and a fact; the last is the first fact.
+  await expect(canvas).toHaveAttribute(
+    'data-rosie',
+    /^rosie\.about\.trex rosie\.(mood|need)\.trex\.\w+ rosie\.fact\.trex\.0$/,
+  );
+  await expect(card.getByText('Tyrannosaurus rex means tyrant lizard king.')).toBeVisible();
+
+  await card.getByRole('button', { name: strings.anotherFact }).click();
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.fact.trex.1');
+  await expect(card.getByText(/sixty teeth/)).toBeVisible();
+
+  // Closed, the camera goes back to the jeep.
+  await card.getByRole('button', { name: strings.close }).click();
+  await expect(card).toBeHidden();
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-inspecting', '');
+  await expect(canvas).toHaveAttribute('data-spotlight', 'false');
+
+  // A tap on the park closes it too. The taps drove the jeep to Rex's gate, so his pen is now just below it.
+  await playFor(page, 6000);
+  await expect(canvas).toHaveAttribute('data-moving', 'false');
+  await canvas.dblclick({ position: { x: box.width * 0.55, y: box.height * 0.66 } });
+  await expect(card).toBeVisible();
+  await canvas.click({ position: { x: box.width * 0.5, y: box.height * 0.4 } });
+  await expect(card).toBeHidden();
+});
+
 test("Rosie's picture wiggles when the player is stuck, and shows them what to do", async ({ page }) => {
   test.slow();
   await page.clock.install();

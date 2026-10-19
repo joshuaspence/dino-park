@@ -8,6 +8,12 @@ export const strings = {
   /** Read aloud by screen readers only: the help button is Rosie's picture. */
   help: 'Ask Ranger Rosie for help',
 
+  // A dinosaur's info card (docs/design.md §6). Rosie reads it aloud: these are captions for grown-ups and readers.
+  cardTitle: (name: string) => `About ${name}`,
+  moods: { happy: 'Happy', fine: 'Doing fine', wants: 'Wants something', sad: 'Sad, waiting a long time' },
+  meters: { hungry: 'Food', thirsty: 'Water', dirty: 'Clean', bored: 'Fun', poorly: 'Health' },
+  anotherFact: 'Another fact',
+
   // The parent area (docs/design.md §7). Reading is the gate: a small child can't tap a number named in words.
   gate: 'For grown-ups: press and hold',
   gateAsk: (number: string) => `To continue, tap the number ${number}.`,

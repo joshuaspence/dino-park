@@ -37,8 +37,9 @@ same PR when a decision changes.
 - **`src/storage`** — the saved park in IndexedDB. What's saved, and how old saves migrate, is
   `core/save.ts`.
 - **`src/ui`** — React overlays (HUD, menus, parent area). Keep it thin and out of the render loop.
-- Gameplay has **no text**; the little text there is lives in string files, in **Australian
-  English**.
+- Gameplay has **no text a child needs to read**; the little text there is (the parent area, info
+  card captions) lives in string files, in **Australian English**. What Rosie says, including the
+  species facts, is built in `core/rosie.ts` and `core/facts.ts` and recorded.
 - No analytics, ads, purchases, external links or third-party scripts, and no network calls other
   than to the game's own site: the game collects nothing.
 - Every third-party asset is CC0 or similarly licensed and recorded in `CREDITS.md`.

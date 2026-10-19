@@ -4,10 +4,13 @@ import {
   NEED_KINDS,
   type NeedKind,
   TUTORIAL_NEED,
+  type Resident,
   eggReady,
+  moodOf,
   supplyFor,
   tutorialStep,
 } from './needs';
+import { SPECIES_FACTS } from './facts';
 import type { StationKind } from './park';
 import { LAUNCH_SPECIES, SPECIES, type SpeciesId, UNLOCK_ORDER } from './species';
 
@@ -107,6 +110,16 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
     lines.set(`rosie.load.${kind}`, `Got ${supply}!`);
   }
   CHEERS.forEach((cheer, i) => lines.set(`rosie.cheer.${i}`, cheer));
+  // A dinosaur's info card (docs/design.md §6): who it is, how it feels, and what the real species was like.
+  for (const species of SPECIES_SPOKEN_OF) {
+    const { name, verb } = subject(species);
+    const about = SPECIES_FACTS[species];
+    const these = SPECIES[species].herdSize > 1 ? 'These are' : 'This is';
+    lines.set(`rosie.about.${species}`, `${these} ${SPECIES[species].residentName}! ${name} ${verb} ${about.spoken}.`);
+    lines.set(`rosie.mood.${species}.happy`, `${name} ${verb} happy!`);
+    lines.set(`rosie.mood.${species}.fine`, `${name} ${verb} doing fine.`);
+    about.facts.forEach((fact, i) => lines.set(`rosie.fact.${species}.${i}`, fact));
+  }
   // Help, when the child taps her picture (docs/design.md §6).
   lines.set('rosie.help.offer', "If you're ever stuck, tap my picture, and I'll show you what to do!");
   lines.set('rosie.help.wait', "Everyone's happy right now! Let's drive around, and look for a bubble.");
@@ -121,6 +134,25 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
     lines.set(`rosie.help.fetch.${kind}`, `Tap the ${station}!`);
   }
   return lines;
+}
+
+/**
+ * What Rosie says when a dinosaur's card opens: who it is, how it feels (what it wants, if anything), and fact number
+ * `fact` about its species, counting round.
+ */
+export function rosieAbout(resident: Resident, fact: number): readonly Beat[] {
+  const { species, need } = resident;
+  const mood = moodOf(resident);
+  const facts = SPECIES_FACTS[species].facts;
+  return [
+    { line: `rosie.about.${species}` },
+    {
+      line: need
+        ? `rosie.need.${species}.${need.kind}`
+        : `rosie.mood.${species}.${mood === 'happy' ? 'happy' : 'fine'}`,
+    },
+    { line: `rosie.fact.${species}.${((fact % facts.length) + facts.length) % facts.length}` },
+  ];
 }
 
 /** What Rosie says when the game starts: a hello for a new park, a welcome back for one with progress. */
