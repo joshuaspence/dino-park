@@ -579,6 +579,8 @@ test('fades the music in even when its first play is refused', async ({ page }) 
 });
 
 test('Rosie walks a new player through their first delivery', async ({ page }) => {
+  // It plays about 15 s of game time, which CI's software-rendered WebKit takes 70–90 s over.
+  test.slow();
   await page.clock.install();
   await page.goto('./');
   const canvas = page.locator('canvas.world');
