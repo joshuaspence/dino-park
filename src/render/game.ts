@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { type Mixer, playHonk } from '../audio/mixer';
-import { type Jeep, angleBetween, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
+import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
 import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
@@ -24,6 +24,13 @@ export interface GameHandle {
 const CAMERA_OFFSET = new THREE.Vector3(0, 24, 30);
 /** How quickly the camera catches up with the jeep (per second; higher is snappier). */
 const CAMERA_FOLLOW = 3;
+/** At full speed the camera pulls back this much further, to show more of the road ahead. */
+const CAMERA_PULL_BACK = 0.15;
+/** A delivery or hatch draws the camera in this close on the dinosaur or nest, for this long. */
+const SPOTLIGHT_ZOOM = 0.55;
+const SPOTLIGHT_SECONDS = 2.5;
+/** How quickly the camera's distance eases between following and spotlighting (per second). */
+const CAMERA_ZOOM_RATE = 2;
 /** A press shorter than this, that barely moves, is a tap; longer is hold-to-drive. */
 const TAP_MS = 300;
 const TAP_SLOP_PX = 12;
@@ -417,13 +424,32 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
   observer.observe(canvas);
   resize();
 
-  const lookAt = new THREE.Vector3();
-  function placeCamera(blend: number): void {
-    lookAt.set(jeep.position.x, 0, jeep.position.z);
-    camera.position.lerp(lookAt.clone().add(CAMERA_OFFSET), blend);
-    camera.lookAt(camera.position.x - CAMERA_OFFSET.x, 0, camera.position.z - CAMERA_OFFSET.z);
+  /** A moment worth a closer look, which the camera holds instead of the jeep for a while. */
+  let spotlight: { point: Point; left: number } | null = null;
+  let zoom = 1;
+  const offset = new THREE.Vector3();
+  const goal = new THREE.Vector3();
+  /**
+   * Follows the jeep, or the spotlight while there is one. Only the distance and focus change: the camera keeps one
+   * compass direction, so a spot the child is about to tap never slides away under their finger.
+   */
+  function placeCamera(blend: number, delta: number): void {
+    if (spotlight) {
+      spotlight.left -= delta;
+      if (spotlight.left <= 0) {
+        spotlight = null;
+      }
+    }
+    const targetZoom = spotlight ? SPOTLIGHT_ZOOM : 1 + (CAMERA_PULL_BACK * jeep.speed) / CRUISE_SPEED;
+    zoom = blend >= 1 ? targetZoom : THREE.MathUtils.damp(zoom, targetZoom, CAMERA_ZOOM_RATE, delta);
+    const focus = spotlight?.point ?? jeep.position;
+    offset.copy(CAMERA_OFFSET).multiplyScalar(zoom);
+    goal.set(focus.x, 0, focus.z).add(offset);
+    camera.position.lerp(goal, blend);
+    camera.lookAt(camera.position.x - offset.x, 0, camera.position.z - offset.z);
+    canvas.dataset.spotlight = String(spotlight !== null);
   }
-  placeCamera(1);
+  placeCamera(1, 0);
 
   const dot = new THREE.Matrix4();
   function updateTrail(): void {
@@ -462,7 +488,12 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
         for (const dino of herds.get(event.species) ?? []) {
           dino.play('jump');
         }
+        const pen = PARK.pens.find((candidate) => candidate.species === event.species);
+        if (pen) {
+          spotlight = { point: pen.position, left: SPOTLIGHT_SECONDS };
+        }
       } else if (event.type === 'hatch') {
+        spotlight = { point: PARK.nest, left: SPOTLIGHT_SECONDS };
         // The shells take the full egg's size, so burst it before the next egg starts small.
         void hatch(care.eggsHatched - 1);
         egg.scale.setScalar(EGG_START_SIZE);
@@ -576,7 +607,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
 
     sun.position.set(jeep.position.x + 15, 30, jeep.position.z + 10);
     sun.target.position.set(jeep.position.x, 0, jeep.position.z);
-    placeCamera(1 - Math.exp(-CAMERA_FOLLOW * delta));
+    placeCamera(1 - Math.exp(-CAMERA_FOLLOW * delta), delta);
 
     for (const dino of dinos) {
       dino.update(delta);
