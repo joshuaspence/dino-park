@@ -5,6 +5,8 @@ import { strings } from './strings';
 
 /** How long a grown-up holds the lock before the gate asks its question (docs/design.md §7). */
 const HOLD_MS = 3000;
+/** After a wrong number the lock ignores holds this long, so guessing all nine takes minutes, not seconds. */
+const COOLDOWN_MS = 30_000;
 
 interface Props {
   settings: Settings;
@@ -12,18 +14,41 @@ interface Props {
   onReset(): void;
 }
 
-type Stage =
-  { name: 'closed' } | { name: 'asking'; answer: number; order: number[] } | { name: 'open'; confirming: boolean };
+/** A number to tap, named in words, among the digits 1–9 in a shuffled order. */
+interface Question {
+  readonly answer: number;
+  readonly order: readonly number[];
+}
+
+/**
+ * Where the parent area is: shut, asking the gate's question, or open. Resetting the park, the one thing here that
+ * can't be undone, asks a question of its own.
+ */
+type Stage = { name: 'closed' } | { name: 'asking'; question: Question } | { name: 'open'; resetting: Question | null };
 
 /** A new question each time, with the numbers shuffled, so a lucky guess doesn't teach the answer. */
-function ask(): Stage {
+function ask(): Question {
   const order = [1, 2, 3, 4, 5, 6, 7, 8, 9];
   for (let i = order.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [order[i], order[j]] = [order[j] as number, order[i] as number];
   }
-  return { name: 'asking', answer: 1 + Math.floor(Math.random() * 9), order };
+  return { answer: 1 + Math.floor(Math.random() * 9), order };
 }
+
+function Numbers({ question, onAnswer }: { question: Question; onAnswer(right: boolean): void }) {
+  return (
+    <div className="parent-numbers">
+      {question.order.map((number) => (
+        <button key={number} type="button" onClick={() => onAnswer(number === question.answer)}>
+          {number}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const numberWord = (question: Question) => strings.numberWords[question.answer - 1] ?? '';
 
 /**
  * The grown-up gate and the parent area behind it: a quiet lock in the corner that opens only after a 3-second hold
@@ -33,13 +58,23 @@ export function ParentArea({ settings, onVolume, onReset }: Props) {
   const [stage, setStage] = useState<Stage>({ name: 'closed' });
   const [holding, setHolding] = useState(false);
   const timer = useRef<number | undefined>(undefined);
+  const lockedUntil = useRef(0);
+
+  /** A wrong number shuts the parent area and makes the lock ignore holds for a while. */
+  const wrong = () => {
+    lockedUntil.current = performance.now() + COOLDOWN_MS;
+    setStage({ name: 'closed' });
+  };
 
   const startHold = () => {
     window.clearTimeout(timer.current);
+    if (performance.now() < lockedUntil.current) {
+      return;
+    }
     setHolding(true);
     timer.current = window.setTimeout(() => {
       setHolding(false);
-      setStage(ask());
+      setStage({ name: 'asking', question: ask() });
     }, HOLD_MS);
   };
   const stopHold = () => {
@@ -76,20 +111,11 @@ export function ParentArea({ settings, onVolume, onReset }: Props) {
 
       {stage.name === 'asking' && (
         <div className="parent-panel" role="dialog" aria-modal="true" aria-labelledby="parent-ask">
-          <p id="parent-ask">{strings.gateAsk(strings.numberWords[stage.answer - 1] ?? '')}</p>
-          <div className="parent-numbers">
-            {stage.order.map((number) => (
-              <button
-                key={number}
-                type="button"
-                onClick={() =>
-                  setStage(number === stage.answer ? { name: 'open', confirming: false } : { name: 'closed' })
-                }
-              >
-                {number}
-              </button>
-            ))}
-          </div>
+          <p id="parent-ask">{strings.gateAsk(numberWord(stage.question))}</p>
+          <Numbers
+            question={stage.question}
+            onAnswer={(right) => (right ? setStage({ name: 'open', resetting: null }) : wrong())}
+          />
           <button type="button" onClick={() => setStage({ name: 'closed' })}>
             {strings.close}
           </button>
@@ -112,18 +138,18 @@ export function ParentArea({ settings, onVolume, onReset }: Props) {
               />
             </label>
           ))}
-          {stage.confirming ? (
+          {stage.resetting ? (
             <div className="parent-confirm">
-              <p>{strings.resetConfirm}</p>
-              <button type="button" onClick={onReset}>
-                {strings.resetYes}
-              </button>
-              <button type="button" onClick={() => setStage({ name: 'open', confirming: false })}>
+              <p id="parent-reset-ask">
+                {strings.resetConfirm} {strings.resetAsk(numberWord(stage.resetting))}
+              </p>
+              <Numbers question={stage.resetting} onAnswer={(right) => (right ? onReset() : wrong())} />
+              <button type="button" onClick={() => setStage({ name: 'open', resetting: null })}>
                 {strings.resetNo}
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => setStage({ name: 'open', confirming: true })}>
+            <button type="button" onClick={() => setStage({ name: 'open', resetting: ask() })}>
               {strings.reset}
             </button>
           )}

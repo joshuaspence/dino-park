@@ -358,10 +358,9 @@ test('a dinosaur calls out when it wants something', async ({ page }) => {
   expect(started.some((seconds) => seconds > 0.3)).toBe(true);
 });
 
-/** Opens the parent area as a grown-up would: holds the lock for 3 s, then taps the number named in words. */
-async function openParentArea(page: Page): Promise<void> {
-  const gate = page.getByRole('button', { name: strings.gate });
-  const box = await gate.boundingBox();
+/** Holds the grown-up gate's lock for its full 3 s. */
+async function holdGate(page: Page): Promise<void> {
+  const box = await page.getByRole('button', { name: strings.gate }).boundingBox();
   if (!box) {
     throw new Error('The grown-up gate has no size');
   }
@@ -369,12 +368,26 @@ async function openParentArea(page: Page): Promise<void> {
   await page.mouse.down();
   await page.clock.fastForward(3100);
   await page.mouse.up();
-  const question = (await page.locator('#parent-ask').textContent()) ?? '';
-  const word = strings.numberWords.find((candidate) => question.includes(` ${candidate}.`));
+}
+
+/** The number a question names in words, as its digit. */
+async function namedNumber(page: Page, question: string): Promise<number> {
+  const text = (await page.locator(question).textContent()) ?? '';
+  const word = strings.numberWords.find((candidate) => text.includes(` ${candidate}.`));
   if (!word) {
-    throw new Error(`No number named in "${question}"`);
+    throw new Error(`No number named in "${text}"`);
   }
-  await page.getByRole('button', { name: String(strings.numberWords.indexOf(word) + 1), exact: true }).click();
+  return strings.numberWords.indexOf(word) + 1;
+}
+
+/** Taps `number` among the shuffled digits on screen. */
+const tapNumber = (page: Page, number: number) =>
+  page.getByRole('button', { name: String(number), exact: true }).click();
+
+/** Opens the parent area as a grown-up would: holds the lock for 3 s, then taps the number named in words. */
+async function openParentArea(page: Page): Promise<void> {
+  await holdGate(page);
+  await tapNumber(page, await namedNumber(page, '#parent-ask'));
   await expect(page.getByRole('heading', { name: strings.parentTitle })).toBeVisible();
 }
 
@@ -382,28 +395,22 @@ test('keeps the parent area behind a hold and a number named in words', async ({
   await page.clock.install();
   await page.goto('./');
   await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
-  const gate = page.getByRole('button', { name: strings.gate });
 
   // A tap, or a hold that isn't long enough, asks nothing.
-  await gate.click();
+  await page.getByRole('button', { name: strings.gate }).click();
   await page.clock.fastForward(3100);
   await expect(page.locator('#parent-ask')).toHaveCount(0);
 
   // A wrong number closes the gate again.
-  const box = await gate.boundingBox();
-  if (!box) {
-    throw new Error('The grown-up gate has no size');
-  }
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.clock.fastForward(3100);
-  await page.mouse.up();
-  const question = (await page.locator('#parent-ask').textContent()) ?? '';
-  const answer = strings.numberWords.findIndex((word) => question.includes(` ${word}.`)) + 1;
-  await page.getByRole('button', { name: String((answer % 9) + 1), exact: true }).click();
+  await holdGate(page);
+  await tapNumber(page, ((await namedNumber(page, '#parent-ask')) % 9) + 1);
   await expect(page.locator('#parent-ask')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: strings.parentTitle })).toHaveCount(0);
 
+  // ...and the lock then ignores holds for a while, so guessing is slow.
+  await holdGate(page);
+  await expect(page.locator('#parent-ask')).toHaveCount(0);
+  await page.clock.fastForward(30_000);
   await openParentArea(page);
   await expect(page.getByText(`${strings.version} `)).toContainText('0.0.0');
 });
@@ -451,11 +458,21 @@ test('resets the park from the parent area, after asking', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-eggs-hatched', '1');
 
   await openParentArea(page);
-  await page.getByRole('button', { name: strings.reset }).click();
   // Changing your mind keeps the park.
-  await page.getByRole('button', { name: strings.resetNo }).click();
   await page.getByRole('button', { name: strings.reset }).click();
-  await page.getByRole('button', { name: strings.resetYes }).click();
+  await page.getByRole('button', { name: strings.resetNo }).click();
+  // So does a wrong number, which shuts the parent area too.
+  await page.getByRole('button', { name: strings.reset }).click();
+  await tapNumber(page, ((await namedNumber(page, '#parent-reset-ask')) % 9) + 1);
+  await expect(page.getByRole('heading', { name: strings.parentTitle })).toHaveCount(0);
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-eggs-hatched', '1');
+
+  // Resetting takes its own named number.
+  await page.clock.fastForward(30_000);
+  await openParentArea(page);
+  await page.getByRole('button', { name: strings.reset }).click();
+  await tapNumber(page, await namedNumber(page, '#parent-reset-ask'));
 
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   await playFor(page, 200);
