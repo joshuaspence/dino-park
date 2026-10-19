@@ -2,12 +2,14 @@ import * as THREE from 'three';
 
 import { type Jeep, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
 import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
+import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
-import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, speciesInPark } from '../core/species';
-import { type DinoInstance, loadDinoSkin } from './dinoSkin';
+import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, UNLOCK_ORDER, speciesInPark } from '../core/species';
+import { type DinoInstance, type DinoSkin, loadDinoSkin } from './dinoSkin';
 import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
+import { loadPark, storePark } from '../storage/parkStore';
 import { buildPark } from './parkScene';
 
 export interface GameHandle {
@@ -113,6 +115,10 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   const herds = new Map<SpeciesId, DinoInstance[]>();
 
   let care = startCare(PARK);
+  /** Needs wait for the saved park, so nothing happens on a fresh park that's about to be replaced. */
+  let loaded = false;
+  /** False when the stored park is from a newer version of the game, which this one mustn't overwrite. */
+  let canSave = true;
   const bubbles = PARK.pens.map((pen) => {
     const bubble = new THREE.Sprite();
     bubble.position.set(pen.position.x, BUBBLE_HEIGHT, pen.position.z);
@@ -150,7 +156,47 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   /** Half-shells flying apart after a hatch, removed once they land. */
   const shells: { mesh: THREE.Mesh; velocity: THREE.Vector3; age: number }[] = [];
 
-  async function hatch(species: SpeciesId | null): Promise<void> {
+  /** Each model's loading, shared so the park and every hatch parse a model once. */
+  const skins = new Map<string, Promise<DinoSkin>>();
+  function skinFor(model: string): Promise<DinoSkin> {
+    let skin = skins.get(model);
+    if (!skin) {
+      skin = loadDinoSkin(model);
+      skins.set(model, skin);
+    }
+    return skin;
+  }
+
+  /**
+   * What egg number `index` (counting from 0) brings out: the next species to unlock, or, while that species has no
+   * model or once everything has hatched, a half-size baby of a launch dinosaur (docs/design.md §5). The baby is
+   * picked by the egg's number, so a reload brings back the same one.
+   */
+  function hatchlingOf(index: number): { species: SpeciesId | null; model: string | null; baby: boolean } {
+    const species = UNLOCK_ORDER[index];
+    const model = species && SPECIES[species].model;
+    if (species && model) {
+      return { species, model, baby: false };
+    }
+    const babies = LAUNCH_SPECIES.flatMap((id) => SPECIES[id].model ?? []);
+    return { species: null, model: babies[index % babies.length] ?? null, baby: true };
+  }
+
+  /** Stands a new dinosaur in the next spot of the arc by the nest, facing out. */
+  function placeByNest(skin: DinoSkin, baby: boolean): DinoInstance {
+    const dino = skin.create();
+    if (baby) {
+      dino.object.scale.multiplyScalar(0.5);
+    }
+    const spot = hatchlingSpot(hatchlings++);
+    dino.object.position.set(spot.x, 0, spot.z);
+    dino.object.rotation.y = Math.atan2(spot.x - PARK.nest.x, spot.z - PARK.nest.z);
+    scene.add(dino.object);
+    dinos.push(dino);
+    return dino;
+  }
+
+  async function hatch(index: number): Promise<void> {
     for (const side of [-1, 1]) {
       const half = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 6, 0, 2 * Math.PI, 0, Math.PI / 2), shellMaterial);
       half.position.copy(egg.position);
@@ -159,37 +205,21 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       shells.push({ mesh: half, velocity: new THREE.Vector3(side * 3, 6, 1.5), age: 0 });
       scene.add(half);
     }
-    // An egg always brings out a dinosaur. One whose species has no model yet, or that comes after everything has
-    // hatched, is a half-size baby of a launch dinosaur instead (docs/design.md §5).
-    const model = species && SPECIES[species].model;
-    const babyModels = LAUNCH_SPECIES.flatMap((id) => SPECIES[id].model ?? []);
-    const standIn = model ? null : (babyModels[Math.floor(Math.random() * babyModels.length)] ?? null);
-    const hatchling = model ?? standIn;
-    if (!hatchling) {
+    const { species, model, baby } = hatchlingOf(index);
+    if (!model) {
       return;
     }
-    const skin = await loadDinoSkin(hatchling);
+    const skin = await skinFor(model);
     if (disposed) {
       return;
     }
-    const herdSize = species && model ? SPECIES[species].herdSize : 1;
-    const herd: DinoInstance[] = [];
-    for (let i = 0; i < herdSize; i++) {
-      const dino = skin.create();
-      if (standIn) {
-        dino.object.scale.multiplyScalar(0.5);
-      }
-      const spot = hatchlingSpot(hatchlings++);
-      dino.object.position.set(spot.x, 0, spot.z);
-      dino.object.rotation.y = Math.atan2(spot.x - PARK.nest.x, spot.z - PARK.nest.z);
-      scene.add(dino.object);
+    const herd = Array.from({ length: species ? SPECIES[species].herdSize : 1 }, () => placeByNest(skin, baby));
+    for (const dino of herd) {
       dino.play('jump');
-      dinos.push(dino);
-      herd.push(dino);
     }
     // A species with a pen runs there once it has celebrated, along the road the child will drive, so they see
     // where it went; a stand-in baby stays by the nest.
-    const pen = species && model ? PARK.pens.find((candidate) => candidate.species === species) : undefined;
+    const pen = species ? PARK.pens.find((candidate) => candidate.species === species) : undefined;
     if (pen) {
       const roads = openRoads(PARK, care.eggsHatched);
       const road = findRoute(roads, nearestRoadPosition(roads, PARK.nest), nearestRoadPosition(roads, penGate(pen)));
@@ -245,19 +275,25 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   let disposed = false;
 
   async function populate(): Promise<void> {
-    const rosie = (await loadDinoSkin(ROSIE_MODEL)).create();
+    // Fetch every pen's model alongside the save, rather than after it: a stand-in baby is one of the same models.
+    const models = PARK.pens.flatMap((pen) => SPECIES[pen.species].model ?? []);
+    const [saved, rosieSkin] = await Promise.all([loadPark(), skinFor(ROSIE_MODEL), ...models.map(skinFor)]);
+    if (disposed) {
+      return;
+    }
+    care = resumeCare(PARK, saved === 'newer' ? null : saved);
+    canSave = saved !== 'newer';
+    loaded = true;
+    const rosie = rosieSkin.create();
     const inPark = speciesInPark(care.eggsHatched);
     const residents = await Promise.all(
       PARK.pens
         .filter((pen) => inPark.includes(pen.species))
         .map(async (pen) => {
           const model = SPECIES[pen.species].model;
-          return { pen, skin: model ? await loadDinoSkin(model) : null };
+          return { pen, skin: model ? await skinFor(model) : null };
         }),
     );
-    if (disposed) {
-      return;
-    }
     // Rosie rides standing in the back of the jeep.
     rosie.object.scale.multiplyScalar(0.6);
     rosie.object.position.set(0, 1.3, -0.9);
@@ -274,6 +310,13 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
         dinos.push(dino);
       }
       moveIntoPen(pen, herd);
+    }
+    // The babies hatched so far wait by the nest again.
+    for (let index = 0; index < care.eggsHatched; index++) {
+      const { model, baby } = hatchlingOf(index);
+      if (baby && model) {
+        placeByNest(await skinFor(model), true);
+      }
     }
     canvas.dataset.ready = 'true';
   }
@@ -392,8 +435,15 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
   }
 
   function updateCare(delta: number): void {
+    if (!loaded) {
+      return;
+    }
     const step = stepNeeds(care, PARK, { position: jeep.position, parked: jeep.route.length === 0 }, delta);
     care = step.care;
+    // Progress only changes on a delivery or a hatch, so that's when to save it.
+    if (canSave && step.events.some((event) => event.type === 'deliver' || event.type === 'hatch')) {
+      void storePark(savePark(care));
+    }
     for (const event of step.events) {
       if (event.type === 'deliver') {
         for (const dino of herds.get(event.species) ?? []) {
@@ -401,7 +451,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
         }
       } else if (event.type === 'hatch') {
         // The shells take the full egg's size, so burst it before the next egg starts small.
-        void hatch(event.species);
+        void hatch(care.eggsHatched - 1);
         egg.scale.setScalar(EGG_START_SIZE);
       }
     }
@@ -460,6 +510,7 @@ export function startGame(canvas: HTMLCanvasElement): GameHandle {
       .flatMap((resident) => (resident.need ? [`${resident.species}:${resident.need.kind}`] : []))
       .join(' ');
     canvas.dataset.cargo = care.cargo ?? '';
+    canvas.dataset.eggsHatched = String(care.eggsHatched);
   }
 
   const timer = new THREE.Timer();

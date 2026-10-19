@@ -26,6 +26,8 @@ same PR when a decision changes.
   by ESLint). It must have Vitest coverage.
 - **`src/render`** — three.js: scene, camera, models, effects. Reads `core` state each frame.
 - **`src/audio`** — Web Audio mixer and voice lines.
+- **`src/storage`** — the saved park in IndexedDB. What's saved, and how old saves migrate, is
+  `core/save.ts`.
 - **`src/ui`** — React overlays (HUD, menus, parent area). Keep it thin and out of the render loop.
 - Gameplay has **no text**; the little text there is lives in string files, in **Australian
   English**.
