@@ -232,3 +232,91 @@ test('draws the camera in on a hatch, then back to the jeep', async ({ page }) =
   await playFor(page, 3000);
   await expect(canvas).toHaveAttribute('data-spotlight', 'false');
 });
+
+test('chimes when something is loaded onto the jeep', async ({ page }) => {
+  // Record every oscillator the game makes, so the test can tell which sounds it played without hearing them.
+  await page.addInitScript(() => {
+    const oscillators: OscillatorNode[] = [];
+    Object.assign(window, { oscillators });
+    const create = AudioContext.prototype.createOscillator;
+    AudioContext.prototype.createOscillator = function (this: AudioContext) {
+      const oscillator = create.call(this);
+      oscillators.push(oscillator);
+      return oscillator;
+    };
+  });
+  const frequencies = () =>
+    page.evaluate(() =>
+      (window as unknown as { oscillators: OscillatorNode[] }).oscillators.map((node) => node.frequency.value),
+    );
+
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  expect(await frequencies()).not.toContain(1568);
+
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // The toy shed is just up and to the left of where the jeep starts.
+  await canvas.click({ position: { x: box.width * 0.36, y: box.height * 0.42 } });
+  await playFor(page, 6000);
+  await expect(canvas).toHaveAttribute('data-cargo', 'toys');
+  // The load chime's two bell notes.
+  expect(await frequencies()).toEqual(expect.arrayContaining([1047, 1568]));
+});
+
+test('goes quiet while the page is hidden, and comes back with it', async ({ page }) => {
+  // Keep hold of the game's audio context, and let the test say whether the page is hidden.
+  await page.addInitScript(() => {
+    const contexts: AudioContext[] = [];
+    Object.assign(window, { contexts });
+    const Original = window.AudioContext;
+    window.AudioContext = class extends Original {
+      constructor(options?: AudioContextOptions) {
+        super(options);
+        contexts.push(this);
+      }
+    };
+  });
+  const state = () => page.evaluate(() => (window as unknown as { contexts: AudioContext[] }).contexts.at(-1)?.state);
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, 'hidden', { value, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+
+  await page.goto('./');
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await page.getByRole('button', { name: 'Honk' }).click();
+  await expect.poll(state).toBe('running');
+
+  await setHidden(true);
+  await expect.poll(state).toBe('suspended');
+  await setHidden(false);
+  await expect.poll(state).toBe('running');
+
+  // Hidden and back before the suspend settles: `state` still reads `running` at the show.
+  const settled = await page.evaluate(async () => {
+    const [context] = (window as unknown as { contexts: AudioContext[] }).contexts;
+    if (!context) throw new Error('The game made no audio context');
+    const pending: Promise<void>[] = [];
+    for (const method of ['suspend', 'resume'] as const) {
+      const original = context[method].bind(context);
+      context[method] = () => {
+        const promise = original();
+        pending.push(promise);
+        return promise;
+      };
+    }
+    for (const value of [true, false]) {
+      Object.defineProperty(document, 'hidden', { value, configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+    await Promise.all(pending);
+    return context.state;
+  });
+  expect(settled).toBe('running');
+});

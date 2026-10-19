@@ -22,47 +22,33 @@ export function createMixer(): Mixer {
     return gain;
   };
   const buses = { music: bus(), effects: bus(), voice: bus() };
+  const unlock = () => {
+    if (context.state === 'suspended') {
+      void context.resume();
+    }
+  };
+  // Hidden pages stop drawing frames but not Web Audio, so a continuous sound such as the engine would play on with
+  // no game in view. Going quiet with the page covers every bus; coming back is allowed once there's been a gesture.
+  // Coming back skips `unlock`'s check: Firefox reads `running` until a suspend settles, so a quick hide and show would
+  // otherwise stay suspended.
+  const onVisibility = () => {
+    if (document.hidden) {
+      void context.suspend();
+    } else {
+      void context.resume();
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
   return {
     context,
     buses,
     get running() {
       return context.state === 'running';
     },
-    unlock() {
-      if (context.state === 'suspended') {
-        void context.resume();
-      }
-    },
+    unlock,
     dispose() {
+      document.removeEventListener('visibilitychange', onVisibility);
       void context.close();
     },
   };
-}
-
-/** A toy car's "beep-beep": two short, bright notes, synthesised rather than recorded. */
-export function playHonk(mixer: Mixer): void {
-  const { context } = mixer;
-  const start = context.currentTime;
-  const tone = context.createBiquadFilter();
-  tone.type = 'lowpass';
-  tone.frequency.value = 2200;
-  tone.connect(mixer.buses.effects);
-  for (const beep of [0, 0.22]) {
-    const envelope = context.createGain();
-    envelope.gain.setValueAtTime(0, start + beep);
-    envelope.gain.linearRampToValueAtTime(0.25, start + beep + 0.02);
-    envelope.gain.setValueAtTime(0.25, start + beep + 0.14);
-    envelope.gain.linearRampToValueAtTime(0, start + beep + 0.18);
-    envelope.connect(tone);
-    // A major third apart, slightly detuned, for a friendly two-tone horn.
-    for (const frequency of [392, 494]) {
-      const oscillator = context.createOscillator();
-      oscillator.type = 'square';
-      oscillator.frequency.value = frequency;
-      oscillator.detune.value = frequency === 392 ? -6 : 6;
-      oscillator.connect(envelope);
-      oscillator.start(start + beep);
-      oscillator.stop(start + beep + 0.2);
-    }
-  }
 }
