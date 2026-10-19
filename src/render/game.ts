@@ -6,7 +6,7 @@ import { startMusic } from '../audio/music';
 import { AWAKE, type Bedtime, type BedtimeMinutes, stepBedtime, wake as wakeBedtime } from '../core/bedtime';
 import { createRosieVoice } from '../audio/rosie';
 import { loadVoices } from '../audio/voices';
-import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, stepJeep } from '../core/jeep';
+import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, pullOver, stepJeep } from '../core/jeep';
 import {
   NEEDS_PER_EGG,
   TUTORIAL_NEED,
@@ -816,6 +816,8 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
         say('rosie.bedtime');
         music.setPlaying(false);
         press = null;
+        // A sleeping park stays still: the jeep eases to a stop just ahead rather than finishing its trip.
+        jeep = pullOver(jeep);
         hooks.onAsleep();
       }
     }
@@ -841,6 +843,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       if (asleep && !bedtime.asleep) {
         bedtime = { ...bedtime, asleep: true };
         dusk = 1;
+        jeep = pullOver(jeep);
         music.setPlaying(false);
       }
     },
