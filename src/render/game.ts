@@ -12,6 +12,7 @@ import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
 import { loadPark, storePark } from '../storage/parkStore';
 import { buildPark } from './parkScene';
+import { startSteering } from './steering';
 
 export interface GameHandle {
   /** Honks the jeep's horn, and the nearest dinosaur turns to look (docs/design.md §4). */
@@ -28,6 +29,8 @@ const TAP_MS = 300;
 const TAP_SLOP_PX = 12;
 /** While holding, how often the route is re-planned towards the finger. */
 const HOLD_REPLAN_SECONDS = 0.25;
+/** A held key or stick drives towards a point this far ahead in its direction, re-planned like a held finger. */
+const STEER_LOOKAHEAD = 12;
 /** Taps this close to a pen gate or station go to it rather than to the nearest road. */
 const SNAP_DISTANCE = 7;
 const TRAIL_SPACING = 1.6;
@@ -529,6 +532,25 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     timer.update();
     const delta = Math.min(timer.getDelta(), 0.1);
 
+    // A held key or stick steers like a held finger, though a finger on the screen wins.
+    const way = steering.direction();
+    if (way && !press) {
+      sinceSteer += delta;
+      if (sinceSteer >= HOLD_REPLAN_SECONDS) {
+        sinceSteer = 0;
+        const length = Math.hypot(way.x, way.z);
+        driveTowards({
+          x: jeep.position.x + (way.x / length) * STEER_LOOKAHEAD,
+          z: jeep.position.z + (way.z / length) * STEER_LOOKAHEAD,
+        });
+      }
+    } else {
+      sinceSteer = HOLD_REPLAN_SECONDS;
+    }
+    if (steering.takeHonk()) {
+      honk();
+    }
+
     if (press && (press.holding || performance.now() - press.at > TAP_MS)) {
       press.holding = true;
       sinceReplan += delta;
@@ -582,33 +604,39 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     }
   }
 
+  function honk(): void {
+    mixer.unlock();
+    playHonk(mixer);
+    // Rosie rides in the jeep, so only dinosaurs standing in the park itself can turn to look, and not hatchlings
+    // about to run to their pen, whose run sets their heading.
+    const walking = new Set(walks.flatMap((walk) => walk.herd));
+    let nearest: DinoInstance | null = null;
+    let nearestDistance = Infinity;
+    for (const dino of dinos) {
+      const { position, parent } = dino.object;
+      const away = distance({ x: position.x, z: position.z }, jeep.position);
+      if (parent === scene && !walking.has(dino) && away < nearestDistance) {
+        nearest = dino;
+        nearestDistance = away;
+      }
+    }
+    if (looking && looking.dino !== nearest) {
+      looking.dino.object.rotation.y = looking.facing;
+    }
+    if (nearest) {
+      const facing = looking?.dino === nearest ? looking.facing : nearest.object.rotation.y;
+      looking = { dino: nearest, facing, left: LOOK_SECONDS };
+    }
+  }
+
+  const steering = startSteering(window, () => mixer.unlock());
+  let sinceSteer = HOLD_REPLAN_SECONDS;
+
   return {
-    honk() {
-      mixer.unlock();
-      playHonk(mixer);
-      // Rosie rides in the jeep, so only dinosaurs standing in the park itself can turn to look, and not hatchlings
-      // about to run to their pen, whose run sets their heading.
-      const walking = new Set(walks.flatMap((walk) => walk.herd));
-      let nearest: DinoInstance | null = null;
-      let nearestDistance = Infinity;
-      for (const dino of dinos) {
-        const { position, parent } = dino.object;
-        const away = distance({ x: position.x, z: position.z }, jeep.position);
-        if (parent === scene && !walking.has(dino) && away < nearestDistance) {
-          nearest = dino;
-          nearestDistance = away;
-        }
-      }
-      if (looking && looking.dino !== nearest) {
-        looking.dino.object.rotation.y = looking.facing;
-      }
-      if (nearest) {
-        const facing = looking?.dino === nearest ? looking.facing : nearest.object.rotation.y;
-        looking = { dino: nearest, facing, left: LOOK_SECONDS };
-      }
-    },
+    honk,
     dispose() {
       disposed = true;
+      steering.dispose();
       renderer.setAnimationLoop(null);
       timer.dispose();
       observer.disconnect();
