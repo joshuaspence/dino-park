@@ -18,6 +18,15 @@ import { LAUNCH_SPECIES, SPECIES, type SpeciesId, UNLOCK_ORDER } from './species
  */
 export type LineId = string;
 
+/** Something for the camera to show while Rosie talks about it: a dinosaur's pen, a station or the egg nest. */
+export type Focus = { readonly pen: SpeciesId } | { readonly station: StationKind } | { readonly nest: true };
+
+/** One thing Rosie says, and what to show while she says it. */
+export interface Beat {
+  readonly line: LineId;
+  readonly focus?: Focus;
+}
+
 const NEED_PHRASES: Readonly<Record<NeedKind, (subject: string, verb: string) => string>> = {
   hungry: (subject, verb) => `${subject} ${verb} hungry!`,
   thirsty: (subject, verb) => `${subject} ${verb} thirsty!`,
@@ -61,13 +70,25 @@ function subject(species: SpeciesId): { name: string; verb: string } {
 /** Every line Rosie can say, by ID: the script that `scripts/generate-rosie.ts` records. */
 export function rosieLines(): ReadonlyMap<LineId, string> {
   const tutee = subject(TUTORIAL_NEED.species);
+  const tutorialSupply = SUPPLIES[supplyFor(TUTORIAL_NEED.kind, TUTORIAL_NEED.species)];
   const tutorialStation = STATION_NAMES[supplyFor(TUTORIAL_NEED.kind, TUTORIAL_NEED.species)];
   const lines = new Map<LineId, string>([
     ['rosie.welcome', "Hi! I'm Ranger Rosie. Let's look after the dinosaurs!"],
     ['rosie.welcome-back', 'Welcome back! The dinosaurs missed you!'],
-    ['rosie.tutorial.need', `${NEED_PHRASES[TUTORIAL_NEED.kind](tutee.name, tutee.verb)} Tap the ${tutorialStation}!`],
-    ['rosie.tutorial.load', `Now tap ${tutee.name}!`],
+    // The guided tour (docs/design.md §6), one step at a time, saying what the arrow points at.
+    ['rosie.tutorial.drive', "This is our jeep. Tap the road by the arrow, and we'll drive there!"],
+    [
+      'rosie.tutorial.need',
+      `Look! See the bubble over ${tutee.name}? ${NEED_PHRASES[TUTORIAL_NEED.kind](tutee.name, tutee.verb)}`,
+    ],
+    ['rosie.tutorial.station', `Let's get ${tutorialSupply} from the ${tutorialStation}. Tap the ${tutorialStation}!`],
+    ['rosie.tutorial.load', `Got ${tutorialSupply}! See it on the jeep? Now tap ${tutee.name}'s pen!`],
+    ['rosie.tutorial.wrong', `Oops, not that one! ${tutee.name} wants ${tutorialSupply}. Tap the ${tutorialStation}!`],
     ['rosie.tutorial.done', `Hooray! You helped ${tutee.name}!`],
+    [
+      'rosie.tutorial.egg',
+      'Every time you help a dinosaur, the egg in the nest grows. When it wobbles, drive to the nest to hatch it!',
+    ],
     ['rosie.egg.ready', "The egg's wobbling! Let's go to the nest!"],
     ['rosie.hatch.baby', 'Look, a baby dinosaur!'],
     // The bedtime timer (docs/design.md §7): she yawns the park to sleep, and greets it when a grown-up wakes it.
@@ -95,27 +116,48 @@ export function welcomeLine(care: Care): LineId {
 }
 
 /**
- * What Rosie says about `event`, given the park `after` it, or null to stay quiet. During the tutorial she tells the
- * child exactly what to tap; after it she names needs and supplies, cheers deliveries and points out a full egg.
+ * What Rosie says about `event`, given the park `after` it: nothing, or a line or two in order. During the tour she
+ * tells the child exactly what to tap, and shows them where; after it she names needs and supplies, cheers deliveries
+ * and points out a full egg.
  */
-export function rosieSays(event: CareEvent, after: Care): LineId | null {
+export function rosieSays(event: CareEvent, after: Care): readonly Beat[] {
+  const tutee: Focus = { pen: TUTORIAL_NEED.species };
+  const tutorialStation: Focus = { station: supplyFor(TUTORIAL_NEED.kind, TUTORIAL_NEED.species) };
   switch (event.type) {
-    // During the tutorial she says what its arrow points at, whichever order the need and the load come in.
+    // During the tour she says what its arrow points at, whichever order the need and the load come in.
     case 'need': {
       const step = tutorialStep(after);
       if (step) {
-        return step === 'station' ? 'rosie.tutorial.need' : 'rosie.tutorial.load';
+        const next = step === 'station' ? 'rosie.tutorial.station' : 'rosie.tutorial.load';
+        return [
+          { line: 'rosie.tutorial.need', focus: tutee },
+          { line: next, focus: step === 'station' ? tutorialStation : tutee },
+        ];
       }
-      return `rosie.need.${event.species}.${event.kind}`;
+      return [{ line: `rosie.need.${event.species}.${event.kind}` }];
     }
-    case 'load':
-      return tutorialStep(after) === 'pen' ? 'rosie.tutorial.load' : `rosie.load.${event.cargo}`;
+    case 'load': {
+      const step = tutorialStep(after);
+      if (step === 'pen') {
+        return [{ line: 'rosie.tutorial.load', focus: tutee }];
+      }
+      // Still on the station step after a load: it was the wrong one.
+      if (step === 'station') {
+        return [{ line: 'rosie.tutorial.wrong', focus: tutorialStation }];
+      }
+      return [{ line: `rosie.load.${event.cargo}` }];
+    }
     case 'deliver':
       if (after.needsMet === 1) {
-        return 'rosie.tutorial.done';
+        return [
+          { line: 'rosie.tutorial.done', focus: { pen: event.species } },
+          { line: 'rosie.tutorial.egg', focus: { nest: true } },
+        ];
       }
-      return eggReady(after) ? 'rosie.egg.ready' : `rosie.cheer.${after.needsMet % CHEERS.length}`;
+      return [{ line: eggReady(after) ? 'rosie.egg.ready' : `rosie.cheer.${after.needsMet % CHEERS.length}` }];
     case 'hatch':
-      return event.species && SPECIES[event.species].model ? `rosie.hatch.${event.species}` : 'rosie.hatch.baby';
+      return [
+        { line: event.species && SPECIES[event.species].model ? `rosie.hatch.${event.species}` : 'rosie.hatch.baby' },
+      ];
   }
 }

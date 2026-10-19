@@ -16,13 +16,13 @@ import {
   startCare,
   stepNeeds,
   supplyFor,
-  tutorialStep,
 } from '../core/needs';
-import { rosieSays, welcomeLine } from '../core/rosie';
+import { type Beat, type Focus, type LineId, rosieSays, welcomeLine } from '../core/rosie';
 import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
 import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, UNLOCK_ORDER, speciesInPark } from '../core/species';
+import { FIRST_DRIVE, holdUntilDriven, tourStep } from '../core/tour';
 import { type DinoInstance, type DinoSkin, loadDinoSkin } from './dinoSkin';
 import { cargoIcon, iconMaterial, needIcon } from './icons';
 import { buildJeep } from './jeepModel';
@@ -73,6 +73,8 @@ const CAMERA_PULL_BACK = 0.15;
 /** A delivery or hatch draws the camera in this close on the dinosaur or nest, for this long. */
 const SPOTLIGHT_ZOOM = 0.55;
 const SPOTLIGHT_SECONDS = 2.5;
+/** While Rosie talks about a place the camera shows it, and holds there this much longer once she's finished. */
+const FOCUS_LINGER_SECONDS = 0.5;
 /** How quickly the camera's distance eases between following and spotlighting (per second). */
 const CAMERA_ZOOM_RATE = 2;
 /** A press shorter than this, that barely moves, is a tap; longer is hold-to-drive. */
@@ -95,8 +97,10 @@ const SAD_GROWTH = 1.4;
 const EGG_START_SIZE = 0.6;
 const EGG_FULL_SIZE = 1.5;
 const SHELL_SECONDS = 1.2;
-/** The tutorial's arrow floats this high over what to tap next, bobbing to catch the eye. */
+/** The guided tour's arrow floats this high over what to tap next, bobbing to catch the eye. */
 const ARROW_HEIGHT = 4.5;
+/** A tap this close to the arrow on screen, in CSS pixels, is a tap on what it points at. */
+const ARROW_TAP_PX = 48;
 /** Hatchlings stand in an arc on the nest's far side from the cross road, wrapping round once it's full. */
 const HATCHLING_SPOTS = 7;
 const HATCHLING_RING = 4.5;
@@ -190,11 +194,13 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   let dusk = 0;
   /** Rosie says hello once, when the park has loaded and there's sound to hear her by. */
   let welcomed = false;
+  /** Whether the child has driven the jeep yet since the game opened: the guided tour's first step. */
+  let driven = false;
   /**
-   * Rosie's latest line from while sound can't play, kept for when it can. Given to her voice, it would wait in a
+   * Rosie's latest lines from while sound can't play, kept for when it can. Given to her voice, they would wait in a
    * paused clip and play, out of turn, before her welcome.
    */
-  let held: string | null = null;
+  let held: readonly Beat[] | null = null;
   /** Rosie herself, riding in the jeep, who hops when a dinosaur is helped. */
   let rosieModel: DinoInstance | null = null;
   /** False when the stored park is from a newer version of the game, which this one mustn't overwrite. */
@@ -408,6 +414,25 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
+  /** What the guided tour's arrow is pointing at, if it's showing. */
+  let pointAt: Point | undefined;
+  const onScreen = new THREE.Vector3();
+
+  /**
+   * What the arrow points at, when a tap lands on or near it. The arrow floats well above the ground, so the ground
+   * under a tap on it is somewhere else entirely, and a child who taps the arrow means what it points at.
+   */
+  function arrowTargetAt(clientX: number, clientY: number): Point | null {
+    if (!pointAt || !arrow.visible) {
+      return null;
+    }
+    const rect = canvas.getBoundingClientRect();
+    onScreen.copy(arrow.position).project(camera);
+    const x = rect.left + ((onScreen.x + 1) / 2) * rect.width;
+    const y = rect.top + ((1 - onScreen.y) / 2) * rect.height;
+    return Math.hypot(clientX - x, clientY - y) <= ARROW_TAP_PX ? pointAt : null;
+  }
+
   function groundPointAt(clientX: number, clientY: number): Point | null {
     const rect = canvas.getBoundingClientRect();
     pointer.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
@@ -426,6 +451,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     const from = nearestRoadPosition(roads, jeep.position);
     const to = nearestRoadPosition(roads, target);
     jeep = driveAlong(jeep, findRoute(roads, from, to));
+    driven ||= jeep.route.length > 0;
   }
 
   let press: { id: number; x: number; y: number; at: number; holding: boolean } | null = null;
@@ -461,7 +487,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       return;
     }
     if (!press.holding) {
-      const target = groundPointAt(event.clientX, event.clientY);
+      const target = arrowTargetAt(event.clientX, event.clientY) ?? groundPointAt(event.clientX, event.clientY);
       if (target) {
         driveTowards(snapToDestination(target));
       }
@@ -579,10 +605,11 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       // A sleeping park isn't greeted: waking it says good morning instead.
       if (!welcomed && !bedtime.asleep) {
         welcomed = true;
-        say(welcomeLine(care));
+        // A new player's first step in the guided tour is driving, so she says how straight away.
+        say(welcomeLine(care), ...(tourStep(care, driven) === 'drive' ? ['rosie.tutorial.drive'] : []));
       }
       if (held) {
-        say(held);
+        say(...held);
         held = null;
       }
     }
@@ -595,17 +622,15 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       canvas.dataset.pointer = '';
       return;
     }
-    const step = stepNeeds(care, PARK, { position: jeep.position, parked: jeep.route.length === 0 }, delta);
+    const jeepAt = { position: jeep.position, parked: jeep.route.length === 0 };
+    const step = stepNeeds(holdUntilDriven(care, driven), PARK, jeepAt, delta);
     care = step.care;
     // Progress only changes on a delivery or a hatch, so that's when to save it.
     if (canSave && step.events.some((event) => event.type === 'deliver' || event.type === 'hatch')) {
       void storePark(savePark(care));
     }
     for (const event of step.events) {
-      const line = rosieSays(event, care);
-      if (line) {
-        say(line);
-      }
+      say(...rosieSays(event, care));
       if (event.type === 'need') {
         playNeed(mixer);
         voices.play(event.species, 'need');
@@ -662,19 +687,21 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     canvas.dataset.cargo = care.cargo ?? '';
     canvas.dataset.eggsHatched = String(care.eggsHatched);
 
-    const tutorial = tutorialStep(care);
-    const pointAt =
-      tutorial === 'pen'
-        ? tutorialPen && penGate(tutorialPen)
-        : tutorial === 'station'
-          ? tutorialStation?.position
-          : undefined;
+    const tour = tourStep(care, driven);
+    pointAt =
+      tour === 'drive'
+        ? FIRST_DRIVE
+        : tour === 'pen'
+          ? tutorialPen && penGate(tutorialPen)
+          : tour === 'station'
+            ? tutorialStation?.position
+            : undefined;
     arrow.visible = pointAt !== undefined;
     if (pointAt) {
       arrow.position.set(pointAt.x, ARROW_HEIGHT + Math.sin(timer.getElapsed() * 4) * 0.4, pointAt.z);
       arrow.rotation.y += delta * 2;
     }
-    canvas.dataset.pointer = pointAt ? (tutorial ?? '') : '';
+    canvas.dataset.pointer = pointAt ? (tour ?? '') : '';
   }
 
   const timer = new THREE.Timer();
@@ -724,6 +751,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     canvas.dataset.moving = String(jeep.route.length > 0);
     updateTrail();
     updateCare(delta);
+    canvas.dataset.speaking = String(rosieVoice.speaking);
     updateBedtime(delta);
     updateLooking(delta);
 
@@ -789,16 +817,43 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   const engine = startEngine(mixer);
   const voices = loadVoices(mixer);
   const rosieVoice = createRosieVoice(mixer);
-  function say(line: string): void {
-    if (!mixer.running) {
-      held = line;
-      return;
+  /** Where the camera looks while Rosie talks about `focus`. */
+  function focusPoint(focus: Focus): Point | undefined {
+    if ('pen' in focus) {
+      return PARK.pens.find((pen) => pen.species === focus.pen)?.position;
     }
-    rosieVoice.say(line);
-    canvas.dataset.rosie = line;
+    if ('station' in focus) {
+      return PARK.stations.find((station) => station.kind === focus.station)?.position;
+    }
+    return PARK.nest;
   }
 
-  // The first-play tutorial's arrow: over the station until its supply is on the jeep, then over the dinosaur's gate.
+  /** Rosie says each line in turn, and the camera shows what each one is about while she says it. */
+  function say(...beats: readonly (LineId | Beat)[]): void {
+    const said = beats.map((beat) => (typeof beat === 'string' ? { line: beat } : beat));
+    if (said.length === 0) {
+      return;
+    }
+    if (!mixer.running) {
+      held = said;
+      return;
+    }
+    rosieVoice.say(
+      said.map(({ line, focus }) => {
+        const point = focus && focusPoint(focus);
+        const show = (seconds: number) => {
+          if (point) {
+            spotlight = { point, left: Math.max(SPOTLIGHT_SECONDS, seconds + FOCUS_LINGER_SECONDS) };
+          }
+        };
+        return { line, onStart: show };
+      }),
+    );
+    canvas.dataset.rosie = said.map(({ line }) => line).join(' ');
+  }
+
+  // The guided tour's arrow: over the road to drive to, then over the station until its supply is on the jeep, then
+  // over the dinosaur's gate.
   const arrow = new THREE.Mesh(
     new THREE.ConeGeometry(0.9, 2, 4).rotateX(Math.PI),
     new THREE.MeshStandardMaterial({ color: 0xff8a1f, emissive: 0x803000, flatShading: true }),
