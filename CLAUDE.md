@@ -16,13 +16,13 @@ same PR when a decision changes.
   `pnpm-lock.yaml`) and one concern each. Split big work into a stack of PRs, each based on the one
   before; when a lower one is squash-merged, rebase the rest onto `master`.
 - **Show UI and UX changes in the PR description.** Anything that changes what a player or parent
-  sees or hears needs a capture: a screenshot for a static change, an animated GIF (with the `.webm`
-  linked) for motion, a link to the sound for audio, and before and after when it changes existing
-  UI. Capture from `pnpm build && pnpm preview` with a throwaway Playwright script
-  (`page.screenshot()`, `recordVideo`) at 1180×820, adding a phone viewport when the layout differs.
-  Push the files to `<pr-number>/` on the orphan `pr-media` branch (`git switch --orphan pr-media`
-  if it doesn't exist) and embed them by `raw.githubusercontent.com` URL. If no capture would show
-  the change, say why instead.
+  sees or hears needs a capture: a screenshot for a static change, an animated GIF for motion
+  (`ffmpeg -i in.webm out.gif`, with the `.webm` linked), a link to the sound for audio, and before
+  and after when it changes existing UI. Capture from `pnpm build && pnpm preview` with a throwaway
+  Playwright script (`page.screenshot()`, `recordVideo`) at 1180×820, adding a phone viewport when
+  the layout differs. Push the files to `<pr-number>/` on the orphan `pr-media` branch
+  (`git switch --orphan pr-media` if it doesn't exist) and embed them by `raw.githubusercontent.com`
+  URL. If no capture would show the change, say why instead.
 - **A PR is not done when it is opened.** Watch it: fix failing checks, and address each review
   finding or reply with why not, then resolve the thread.
 - **Enable squash auto-merge on every PR** right after opening it (`gh pr merge --auto --squash`).
