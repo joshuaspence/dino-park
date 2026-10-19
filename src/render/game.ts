@@ -586,13 +586,15 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     honk() {
       mixer.unlock();
       playHonk(mixer);
-      // Rosie rides in the jeep, so only dinosaurs standing in the park itself can turn to look.
+      // Rosie rides in the jeep, so only dinosaurs standing in the park itself can turn to look, and not hatchlings
+      // about to run to their pen, whose run sets their heading.
+      const walking = new Set(walks.flatMap((walk) => walk.herd));
       let nearest: DinoInstance | null = null;
       let nearestDistance = Infinity;
       for (const dino of dinos) {
         const { position, parent } = dino.object;
         const away = distance({ x: position.x, z: position.z }, jeep.position);
-        if (parent === scene && away < nearestDistance) {
+        if (parent === scene && !walking.has(dino) && away < nearestDistance) {
           nearest = dino;
           nearestDistance = away;
         }
