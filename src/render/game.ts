@@ -542,10 +542,39 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     trail.instanceMatrix.needsUpdate = true;
   }
 
+  /** A hatch plays out to the end, even when bedtime comes partway through it. */
+  function updateHatch(delta: number): void {
+    for (const shell of shells) {
+      shell.age += delta;
+      shell.velocity.y -= 15 * delta;
+      shell.mesh.position.addScaledVector(shell.velocity, delta);
+      shell.mesh.rotation.x += delta * 6;
+    }
+    for (const shell of shells.filter((candidate) => candidate.age > SHELL_SECONDS)) {
+      scene.remove(shell.mesh);
+      shell.mesh.geometry.dispose();
+      shells.splice(shells.indexOf(shell), 1);
+    }
+
+    stepWalks(delta);
+
+    const inPark = speciesInPark(care.eggsHatched);
+    for (const area of PARK.areas) {
+      const open = inPark.includes(area.species);
+      park.getObjectByName(`gate-${area.species}`)?.traverse((part) => {
+        if (part.name === 'gate-leaf') {
+          const target = open ? (part.userData.side as number) * (Math.PI / 2) : 0;
+          part.rotation.y = THREE.MathUtils.damp(part.rotation.y, target, GATE_SWING, delta);
+        }
+      });
+    }
+  }
+
   function updateCare(delta: number): void {
     if (!loaded || !settingsKnown) {
       return;
     }
+    updateHatch(delta);
     if (mixer.running) {
       // A sleeping park isn't greeted: waking it says good morning instead.
       if (!welcomed && !bedtime.asleep) {
@@ -622,31 +651,6 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     // A ready egg wobbles in bursts, so it catches the eye without buzzing constantly.
     const elapsed = timer.getElapsed();
     egg.rotation.z = eggReady(care) ? Math.sin(elapsed * 14) * 0.2 * Math.max(0, Math.sin(elapsed * 2)) : 0;
-    for (const shell of shells) {
-      shell.age += delta;
-      shell.velocity.y -= 15 * delta;
-      shell.mesh.position.addScaledVector(shell.velocity, delta);
-      shell.mesh.rotation.x += delta * 6;
-    }
-    for (const shell of shells.filter((candidate) => candidate.age > SHELL_SECONDS)) {
-      scene.remove(shell.mesh);
-      shell.mesh.geometry.dispose();
-      shells.splice(shells.indexOf(shell), 1);
-    }
-
-    stepWalks(delta);
-
-    const inPark = speciesInPark(care.eggsHatched);
-    for (const area of PARK.areas) {
-      const open = inPark.includes(area.species);
-      park.getObjectByName(`gate-${area.species}`)?.traverse((part) => {
-        if (part.name === 'gate-leaf') {
-          const target = open ? (part.userData.side as number) * (Math.PI / 2) : 0;
-          part.rotation.y = THREE.MathUtils.damp(part.rotation.y, target, GATE_SWING, delta);
-        }
-      });
-    }
-
     cargo.visible = care.cargo !== null;
     if (care.cargo) {
       cargo.material = iconMaterial(cargoIcon(care.cargo));
