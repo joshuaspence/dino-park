@@ -77,3 +77,14 @@ export const SPECIES_FACTS: Readonly<Record<SpeciesId, SpeciesFacts>> = {
     ],
   },
 };
+
+/** Ranger Rosie herself, a Parasaurolophus, for her own card. */
+export const ROSIE_FACTS: SpeciesFacts = {
+  name: 'Parasaurolophus',
+  spoken: 'a Parasaurolophus',
+  facts: [
+    'Parasaurolophus had a long hollow crest, and could honk through it like a trumpet!',
+    'Parasaurolophus was a duck-billed dinosaur that ate plants.',
+    'Parasaurolophus could walk on two legs, or on all four.',
+  ],
+};

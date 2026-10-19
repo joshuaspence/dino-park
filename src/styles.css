@@ -414,3 +414,52 @@ body,
   margin: 0;
   font-size: 0.9rem;
 }
+
+.card-picture {
+  flex: none;
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.card-picture svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* A station's card: the bubble it answers, and what it loads onto the jeep. */
+.card-answers {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  margin: 1rem 0 0;
+  font-size: 2rem;
+}
+
+.card-answers img,
+.card-answers .mood-face {
+  width: 4rem;
+  height: 4rem;
+}
+
+/* The egg's progress: one step for each dinosaur helped. */
+.egg-steps {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.egg-step {
+  width: 2.25rem;
+  height: 2.75rem;
+  border: 0.2rem solid #c9924d;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: #fff;
+}
+
+.egg-step.done {
+  background: #7fc97f;
+}

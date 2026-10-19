@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { type Care, type CareEvent, NEEDS_PER_EGG, NEED_KINDS, startCare } from './needs';
 import { PARK, type StationKind } from './park';
-import { rosieAbout, rosieLines, rosieSays, welcomeLine } from './rosie';
+import { rosieAbout, rosieLines, rosieOnCard, rosieSays, welcomeLine } from './rosie';
 import { LAUNCH_SPECIES, type SpeciesId, UNLOCK_ORDER } from './species';
 
 const fresh = startCare(PARK);
@@ -135,6 +135,22 @@ describe('Ranger Rosie', () => {
           expect(lines.get(line), line).toBeTruthy();
         }
       }
+    }
+  });
+
+  it('tells what each station is for, how the egg is coming along, and about herself', () => {
+    const lines = rosieLines();
+    const said = (beats: readonly { line: string }[]) => beats.map((beat) => beat.line);
+    for (const station of STATIONS) {
+      expect(lines.get(said(rosieOnCard({ station }, played, 0))[0] ?? '')).toBeTruthy();
+    }
+    expect(said(rosieOnCard({ nest: true }, played, 0))).toEqual(['rosie.about.nest']);
+    expect(said(rosieOnCard({ nest: true }, { ...played, needsMet: NEEDS_PER_EGG }, 0))).toEqual(['rosie.egg.ready']);
+    expect(said(rosieOnCard({ rosie: true }, played, 4))).toEqual(['rosie.about.rosie', 'rosie.fact.rosie.1']);
+    expect(said(rosieOnCard({ dinosaur: 'trex' }, played, 0))[0]).toBe('rosie.about.trex');
+    expect(lines.get('rosie.about.rosie')).toBe("That's me, Ranger Rosie! I'm a Parasaurolophus.");
+    for (let fact = 0; fact < 3; fact++) {
+      expect(lines.get(`rosie.fact.rosie.${fact}`)).toBeTruthy();
     }
   });
 });

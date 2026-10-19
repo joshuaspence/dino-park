@@ -13,6 +13,28 @@ export const strings = {
   moods: { happy: 'Happy', fine: 'Doing fine', wants: 'Wants something', sad: 'Sad, waiting a long time' },
   meters: { hungry: 'Food', thirsty: 'Water', dirty: 'Clean', bored: 'Fun', poorly: 'Health' },
   anotherFact: 'Another fact',
+  rosie: 'Ranger Rosie',
+  stations: {
+    hay: 'Haystack',
+    meat: 'Butcher',
+    fish: 'Fish pond',
+    water: 'Water tower',
+    bath: 'Bath',
+    toys: 'Toy shed',
+    vet: 'Vet tent',
+  },
+  stationFor: {
+    hay: 'Food for plant-eaters',
+    meat: 'Food for meat-eaters',
+    fish: 'Food for Pterodactyls',
+    water: 'A drink for thirsty dinosaurs',
+    bath: 'A bath for muddy dinosaurs',
+    toys: 'Toys for bored dinosaurs',
+    vet: 'Care for poorly dinosaurs',
+  },
+  nest: 'Egg nest',
+  eggProgress: (helped: number, needed: number) => `${helped} of ${needed} dinosaurs helped`,
+  eggReady: 'Ready to hatch!',
 
   // The parent area (docs/design.md §7). Reading is the gate: a small child can't tap a number named in words.
   gate: 'For grown-ups: press and hold',

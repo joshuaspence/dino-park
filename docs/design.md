@@ -190,8 +190,15 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   captions for grown-ups and readers; nothing needs reading. A speech-bubble button tells the next
   fact, three per species, written for 3–6 year olds and true to current palaeontology (the
   Pterodactyl's says it wasn't really a dinosaur). While the card is open Rosie doesn't announce
-  other needs, so she finishes reading it; their bubbles and calls still play. A tap on the park,
-  or the close button, closes it.
+  other needs or loads, so she finishes reading it; their bubbles, calls and chimes still play. A
+  tap on the park, or the close button, closes it.
+- **Stations, the egg nest and Rosie have cards too.** A station's card shows the bubble it's for
+  and a happy face, and Rosie says what it's for ("This is the toy shed. Bored dinosaurs love a toy
+  to play with!"). The nest's shows one egg step for each dinosaur helped towards the next egg,
+  and who's inside stays a surprise. Rosie's own card, from a double tap on the jeep, introduces
+  her as a Parasaurolophus, with facts like any dinosaur's. A double tap's first tap sets off to
+  drive like any tap, so the jeep pulls over when the card opens: asking about a place isn't
+  going there.
 - **Each dinosaur has its own voice** (roar, chirp, honk) for wanting something, being helped and
   sleeping, so children can hear who needs help.
 - **Gentle looping background music**, plus sound effects. Most effects (honk, engine, chimes,
