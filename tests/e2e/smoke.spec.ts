@@ -14,12 +14,12 @@ async function playFor(page: Page, ms: number, until?: () => Promise<boolean>): 
 }
 
 /**
- * Reads or writes the saved park in idb-keyval's default database and store, which is where `storage/parkStore`
- * keeps it under the key `park`.
+ * Reads or writes `key` in idb-keyval's default database and store, which is where `storage/parkStore` keeps the
+ * park (`park`) and the parent area's settings (`settings`).
  */
-function savedPark(page: Page, write?: unknown): Promise<unknown> {
+function stored(page: Page, key: string, write?: unknown): Promise<unknown> {
   return page.evaluate(
-    (value) =>
+    ([key, value]) =>
       new Promise((resolve, reject) => {
         const open = indexedDB.open('keyval-store');
         open.onupgradeneeded = () => open.result.createObjectStore('keyval');
@@ -27,16 +27,16 @@ function savedPark(page: Page, write?: unknown): Promise<unknown> {
         open.onsuccess = () => {
           const store = open.result.transaction('keyval', value === undefined ? 'readonly' : 'readwrite');
           const request =
-            value === undefined
-              ? store.objectStore('keyval').get('park')
-              : store.objectStore('keyval').put(value, 'park');
+            value === undefined ? store.objectStore('keyval').get(key) : store.objectStore('keyval').put(value, key);
           request.onsuccess = () => resolve(value === undefined ? request.result : value);
           request.onerror = () => reject(request.error);
         };
       }),
-    write,
+    [key, write] as const,
   );
 }
+
+const savedPark = (page: Page, write?: unknown) => stored(page, 'park', write);
 
 test('loads the dinosaurs and animates them without errors', async ({ page }) => {
   const errors: string[] = [];
@@ -485,6 +485,86 @@ test('resets the park from the parent area, after asking', async ({ page }) => {
   await playFor(page, 200);
   await expect(canvas).toHaveAttribute('data-eggs-hatched', '0');
   expect(await savedPark(page)).toEqual({ version: 1, needsMet: 0, eggsHatched: 0 });
+});
+
+test('stays asleep at bedtime until a grown-up wakes the park', async ({ page }) => {
+  test.slow();
+  // Every line Rosie says, in order: `data-rosie` only keeps the latest.
+  await page.addInitScript(() => {
+    const said: string[] = [];
+    Object.assign(window, { said });
+    new MutationObserver((changes) => {
+      for (const change of changes) {
+        const line = (change.target as HTMLElement).dataset.rosie;
+        if (line) {
+          said.push(line);
+        }
+      }
+    }).observe(document, { attributes: true, attributeFilter: ['data-rosie'], subtree: true });
+  });
+  const said = () => page.evaluate(() => (window as unknown as { said: string[] }).said);
+  await page.clock.install();
+  await page.goto('./');
+  await stored(page, 'settings', { volumes: { music: 1, effects: 1, voice: 1 }, bedtime: 10, asleep: true });
+  await page.reload();
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-asleep', 'true');
+
+  // Taps don't wake it or drive the jeep, nobody asks for anything, and Rosie doesn't greet anyone. The tap is also
+  // the gesture that lets sound start, so she would speak now if she were going to.
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  await canvas.click({ position: { x: box.width * 0.25, y: box.height * 0.3 } });
+  await playFor(page, 4000);
+  await expect(canvas).toHaveAttribute('data-moving', 'false');
+  await expect(canvas).toHaveAttribute('data-asleep', 'true');
+  await expect(canvas).not.toHaveAttribute('data-needs', /\w+:\w+/);
+  expect(await said()).toEqual([]);
+
+  // Nor does reloading, which opens the park asleep from the start rather than awake for a moment.
+  await page.reload();
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-asleep', 'true');
+  await canvas.click({ position: { x: box.width * 0.25, y: box.height * 0.3 } });
+  await playFor(page, 4000);
+  await expect(canvas).not.toHaveAttribute('data-needs', /\w+:\w+/);
+  expect(await said()).toEqual([]);
+
+  // A grown-up wakes it, and the timer they chose is still set. Rosie says good morning rather than welcome back.
+  await openParentArea(page);
+  await expect(page.getByRole('radio', { name: strings.bedtimeChoice(10) })).toBeChecked();
+  await expect(page.getByText(strings.asleep)).toBeVisible();
+  await page.getByRole('button', { name: strings.wake }).click();
+  await expect(page.getByText(strings.asleep)).toHaveCount(0);
+  await page.getByRole('button', { name: strings.close }).click();
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-asleep', 'false');
+  expect((await said())[0]).toBe('rosie.wake');
+  expect(await said()).not.toContain('rosie.welcome');
+  expect(await stored(page, 'settings')).toMatchObject({ bedtime: 10, asleep: false });
+  await canvas.click({ position: { x: box.width * 0.25, y: box.height * 0.3 } });
+  await playFor(page, 300);
+  await expect(canvas).toHaveAttribute('data-moving', 'true');
+});
+
+test('sets the bedtime timer in the parent area, off by default', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await openParentArea(page);
+  await expect(page.getByRole('radio', { name: strings.bedtimeChoice(0) })).toBeChecked();
+  await page.getByRole('radio', { name: strings.bedtimeChoice(20) }).check();
+  expect(await stored(page, 'settings')).toMatchObject({ bedtime: 20, asleep: false });
+
+  await page.reload();
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await openParentArea(page);
+  await expect(page.getByRole('radio', { name: strings.bedtimeChoice(20) })).toBeChecked();
 });
 
 test('plays the background music once sound starts, and again after the system pauses it', async ({ page }) => {

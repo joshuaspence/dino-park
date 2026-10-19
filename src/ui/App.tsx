@@ -4,6 +4,7 @@ import { type Mixer, createMixer } from '../audio/mixer';
 import { startCare } from '../core/needs';
 import { PARK } from '../core/park';
 import { savePark } from '../core/save';
+import type { BedtimeMinutes } from '../core/bedtime';
 import { type Bus, DEFAULT_SETTINGS, type Settings } from '../core/settings';
 import { type GameHandle, startGame } from '../render/game';
 import { loadSettings, storePark, storeSettings } from '../storage/parkStore';
@@ -18,11 +19,23 @@ export function App() {
   /** Whether the current press on the honk button has already honked. */
   const honked = useRef(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  /** The latest settings, which the game's callback and the parent area's changes build on. */
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
   const webgl2 = supportsWebGL2();
 
+  const changeSettings = (next: Settings) => {
+    settingsRef.current = next;
+    setSettings(next);
+    void storeSettings(next);
+  };
+
+  // Keep the game's bedtime timer in step with the settings, including a park that was asleep when it was closed.
   useEffect(() => {
-    void loadSettings().then(setSettings);
-  }, []);
+    gameRef.current?.setBedtime(settings.bedtime, settings.asleep);
+  }, [settings.bedtime, settings.asleep]);
 
   // Keep the mixer's buses at the parent area's volumes, including once the mixer is made.
   useEffect(() => {
@@ -34,10 +47,18 @@ export function App() {
     }
   });
 
+  // Each change builds on the latest settings, not this render's: the park can fall asleep between a render and a
+  // grown-up's next change, and building on `settings` would undo that.
   const setVolume = (bus: Bus, volume: number) => {
-    const next = { ...settings, volumes: { ...settings.volumes, [bus]: volume } };
-    setSettings(next);
-    void storeSettings(next);
+    const current = settingsRef.current;
+    changeSettings({ ...current, volumes: { ...current.volumes, [bus]: volume } });
+  };
+  const setBedtime = (minutes: BedtimeMinutes) => changeSettings({ ...settingsRef.current, bedtime: minutes });
+  const wake = () => {
+    changeSettings({ ...settingsRef.current, asleep: false });
+    // A grown-up's tap is a gesture, so good morning can be heard even if nobody has tapped the park yet.
+    mixerRef.current?.unlock();
+    gameRef.current?.wake();
   };
 
   // Settings are stored apart from the park, so they survive this.
@@ -50,10 +71,22 @@ export function App() {
       return;
     }
     const mixer = createMixer();
-    const game = startGame(canvasRef.current, mixer);
+    const game = startGame(canvasRef.current, mixer, {
+      onAsleep: () => changeSettings({ ...settingsRef.current, asleep: true }),
+    });
     gameRef.current = game;
     mixerRef.current = mixer;
+    // The park holds still until it knows its settings, so one that went to sleep never opens awake for a moment.
+    let cancelled = false;
+    void loadSettings().then((loaded) => {
+      if (!cancelled) {
+        settingsRef.current = loaded;
+        setSettings(loaded);
+        game.setBedtime(loaded.bedtime, loaded.asleep);
+      }
+    });
     return () => {
+      cancelled = true;
       gameRef.current = null;
       mixerRef.current = null;
       game.dispose();
@@ -81,7 +114,8 @@ export function App() {
       */}
       <button
         type="button"
-        className="honk"
+        // A sleeping park ignores the horn, so the button dims with it.
+        className={settings.asleep ? 'honk sleeping' : 'honk'}
         aria-label={strings.honk}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -117,7 +151,7 @@ export function App() {
         </span>
         <p>{strings.rotate}</p>
       </div>
-      <ParentArea settings={settings} onVolume={setVolume} onReset={resetPark} />
+      <ParentArea settings={settings} onVolume={setVolume} onBedtime={setBedtime} onWake={wake} onReset={resetPark} />
       <small className="build" data-testid="build">
         v{__APP_VERSION__} · {__GIT_SHA__}
       </small>

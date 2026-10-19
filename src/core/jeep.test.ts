@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { CRUISE_SPEED, angleBetween, driveAlong, headingTowards, parkedJeep, stepJeep } from './jeep';
+import {
+  ACCELERATION,
+  CRUISE_SPEED,
+  angleBetween,
+  driveAlong,
+  headingTowards,
+  parkedJeep,
+  pullOver,
+  stepJeep,
+} from './jeep';
+import { routeLength } from './roads';
 import type { Point } from './roads';
 
 const STEP = 1 / 60;
@@ -122,5 +132,49 @@ describe('stepJeep', () => {
       lastSpeed = jeep.route.length > 0 ? jeep.speed : lastSpeed;
     }
     expect(lastSpeed).toBeLessThan(1);
+  });
+});
+
+describe('pullOver', () => {
+  it('cuts a long route short at the braking distance', () => {
+    const cruising = { ...parkedJeep({ x: 0, z: 0 }), speed: CRUISE_SPEED, route: [{ x: 0, z: 50 }] };
+    const stopping = pullOver(cruising);
+    expect(stopping.route).toHaveLength(1);
+    expect(routeLength([stopping.position, ...stopping.route])).toBeCloseTo(CRUISE_SPEED ** 2 / (2 * ACCELERATION));
+  });
+
+  it('follows the route round corners to find where to stop', () => {
+    const cruising = {
+      ...parkedJeep({ x: 0, z: 0 }),
+      speed: CRUISE_SPEED,
+      route: [
+        { x: 0, z: 2 },
+        { x: 10, z: 2 },
+      ],
+    };
+    const stopping = pullOver(cruising);
+    expect(stopping.route[0]).toEqual({ x: 0, z: 2 });
+    expect(stopping.route[1]?.x).toBeCloseTo(CRUISE_SPEED ** 2 / (2 * ACCELERATION) - 2);
+  });
+
+  it('keeps a route that already ends within the braking distance', () => {
+    const cruising = { ...parkedJeep({ x: 0, z: 0 }), speed: CRUISE_SPEED, route: [{ x: 0, z: 1 }] };
+    expect(pullOver(cruising).route).toEqual([{ x: 0, z: 1 }]);
+  });
+
+  it('leaves a parked jeep parked', () => {
+    expect(pullOver(parkedJeep({ x: 3, z: 4 })).route).toEqual([]);
+  });
+
+  it('eases to a stop without exceeding its speed', () => {
+    let jeep = pullOver({ ...parkedJeep({ x: 0, z: 0 }), speed: CRUISE_SPEED, route: [{ x: 0, z: 50 }] });
+    let previous = jeep.speed;
+    for (let i = 0; i < 120 && jeep.route.length > 0; i++) {
+      jeep = stepJeep(jeep, 1 / 60);
+      expect(jeep.speed).toBeLessThanOrEqual(previous + 1e-9);
+      previous = jeep.speed;
+    }
+    expect(jeep.route).toEqual([]);
+    expect(jeep.position.z).toBeLessThan(5);
   });
 });

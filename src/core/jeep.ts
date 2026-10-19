@@ -34,6 +34,29 @@ export function driveAlong(jeep: Jeep, route: readonly Point[]): Jeep {
   return { ...jeep, speed: doublesBack ? 0 : jeep.speed, route: ahead };
 }
 
+/**
+ * Cuts the jeep's route short at its usual braking distance, v²/2a, so it eases to a stop just ahead instead of either
+ * finishing its trip or halting dead. A parked jeep stays parked.
+ */
+export function pullOver(jeep: Jeep): Jeep {
+  let left = jeep.speed ** 2 / (2 * ACCELERATION);
+  let from = jeep.position;
+  const route: Point[] = [];
+  for (const point of jeep.route) {
+    const gap = distance(from, point);
+    if (gap >= left) {
+      if (left > 0) {
+        route.push(lerp(from, point, left / gap));
+      }
+      break;
+    }
+    route.push(point);
+    left -= gap;
+    from = point;
+  }
+  return { ...jeep, route };
+}
+
 export function headingTowards(from: Point, to: Point): number {
   return Math.atan2(to.x - from.x, to.z - from.z);
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { BEDTIME_CHOICES, type BedtimeMinutes } from '../core/bedtime';
 import { BUSES, type Bus, type Settings } from '../core/settings';
 import { strings } from './strings';
 
@@ -11,6 +12,8 @@ const COOLDOWN_MS = 30_000;
 interface Props {
   settings: Settings;
   onVolume(bus: Bus, volume: number): void;
+  onBedtime(minutes: BedtimeMinutes): void;
+  onWake(): void;
   onReset(): void;
 }
 
@@ -52,9 +55,9 @@ const numberWord = (question: Question) => strings.numberWords[question.answer -
 
 /**
  * The grown-up gate and the parent area behind it: a quiet lock in the corner that opens only after a 3-second hold
- * and a number named in words, then volumes, a park reset and the version.
+ * and a number named in words, then volumes, the bedtime timer, a park reset and the version.
  */
-export function ParentArea({ settings, onVolume, onReset }: Props) {
+export function ParentArea({ settings, onVolume, onBedtime, onWake, onReset }: Props) {
   const [stage, setStage] = useState<Stage>({ name: 'closed' });
   const [holding, setHolding] = useState(false);
   const timer = useRef<number | undefined>(undefined);
@@ -138,6 +141,31 @@ export function ParentArea({ settings, onVolume, onReset }: Props) {
               />
             </label>
           ))}
+          <fieldset className="parent-bedtime">
+            <legend>{strings.bedtime}</legend>
+            <p>{strings.bedtimeHelp}</p>
+            <div role="radiogroup" aria-label={strings.bedtime}>
+              {BEDTIME_CHOICES.map((minutes) => (
+                <label key={minutes}>
+                  <input
+                    type="radio"
+                    name="bedtime"
+                    checked={settings.bedtime === minutes}
+                    onChange={() => onBedtime(minutes)}
+                  />
+                  {strings.bedtimeChoice(minutes)}
+                </label>
+              ))}
+            </div>
+            {settings.asleep && (
+              <p className="parent-asleep">
+                {strings.asleep}{' '}
+                <button type="button" onClick={onWake}>
+                  {strings.wake}
+                </button>
+              </p>
+            )}
+          </fieldset>
           {stage.resetting ? (
             <div className="parent-confirm">
               <p id="parent-reset-ask">
