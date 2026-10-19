@@ -11,11 +11,11 @@ import {
   TUTORIAL_NEED,
   eggProgress,
   eggReady,
-  inTutorial,
   isSad,
   startCare,
   stepNeeds,
   supplyFor,
+  tutorialStep,
 } from '../core/needs';
 import { rosieSays, welcomeLine } from '../core/rosie';
 import { resumeCare, savePark } from '../core/save';
@@ -606,19 +606,19 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer): GameHandle {
     canvas.dataset.cargo = care.cargo ?? '';
     canvas.dataset.eggsHatched = String(care.eggsHatched);
 
-    const tutee = care.residents.find((resident) => resident.species === TUTORIAL_NEED.species);
+    const tutorial = tutorialStep(care);
     const pointAt =
-      inTutorial(care) && tutee?.need
-        ? care.cargo === tutorialSupply
-          ? tutorialPen && penGate(tutorialPen)
-          : tutorialStation?.position
-        : undefined;
+      tutorial === 'pen'
+        ? tutorialPen && penGate(tutorialPen)
+        : tutorial === 'station'
+          ? tutorialStation?.position
+          : undefined;
     arrow.visible = pointAt !== undefined;
     if (pointAt) {
       arrow.position.set(pointAt.x, ARROW_HEIGHT + Math.sin(timer.getElapsed() * 4) * 0.4, pointAt.z);
       arrow.rotation.y += delta * 2;
     }
-    canvas.dataset.pointer = !pointAt ? '' : care.cargo === tutorialSupply ? 'pen' : 'station';
+    canvas.dataset.pointer = pointAt ? (tutorial ?? '') : '';
   }
 
   const timer = new THREE.Timer();

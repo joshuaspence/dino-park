@@ -5,8 +5,8 @@ import {
   type NeedKind,
   TUTORIAL_NEED,
   eggReady,
-  inTutorial,
   supplyFor,
+  tutorialStep,
 } from './needs';
 import type { StationKind } from './park';
 import { LAUNCH_SPECIES, SPECIES, type SpeciesId, UNLOCK_ORDER } from './species';
@@ -97,12 +97,16 @@ export function welcomeLine(care: Care): LineId {
  */
 export function rosieSays(event: CareEvent, after: Care): LineId | null {
   switch (event.type) {
-    case 'need':
-      return inTutorial(after) ? 'rosie.tutorial.need' : `rosie.need.${event.species}.${event.kind}`;
+    // During the tutorial she says what its arrow points at, whichever order the need and the load come in.
+    case 'need': {
+      const step = tutorialStep(after);
+      if (step) {
+        return step === 'station' ? 'rosie.tutorial.need' : 'rosie.tutorial.load';
+      }
+      return `rosie.need.${event.species}.${event.kind}`;
+    }
     case 'load':
-      return inTutorial(after) && event.cargo === supplyFor(TUTORIAL_NEED.kind, TUTORIAL_NEED.species)
-        ? 'rosie.tutorial.load'
-        : `rosie.load.${event.cargo}`;
+      return tutorialStep(after) === 'pen' ? 'rosie.tutorial.load' : `rosie.load.${event.cargo}`;
     case 'deliver':
       if (after.needsMet === 1) {
         return 'rosie.tutorial.done';

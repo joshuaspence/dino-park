@@ -7,6 +7,13 @@ import { LAUNCH_SPECIES, type SpeciesId, UNLOCK_ORDER } from './species';
 
 const fresh = startCare(PARK);
 const played: Care = { ...fresh, needsMet: 2 };
+/** The tutorial under way: Steggy is bored. */
+const bored: Care = {
+  ...fresh,
+  residents: fresh.residents.map((resident) =>
+    resident.species === 'stegosaurus' ? { ...resident, need: { kind: 'bored', age: 0 } } : resident,
+  ),
+};
 const STATIONS: readonly StationKind[] = ['hay', 'meat', 'fish', 'water', 'bath', 'toys', 'vet'];
 
 describe('Ranger Rosie', () => {
@@ -33,15 +40,24 @@ describe('Ranger Rosie', () => {
 
   it('walks a new player through their first delivery', () => {
     expect(welcomeLine(fresh)).toBe('rosie.welcome');
-    expect(rosieSays({ type: 'need', species: 'stegosaurus', kind: 'bored' }, fresh)).toBe('rosie.tutorial.need');
-    expect(rosieSays({ type: 'load', cargo: 'toys' }, fresh)).toBe('rosie.tutorial.load');
+    expect(rosieSays({ type: 'need', species: 'stegosaurus', kind: 'bored' }, bored)).toBe('rosie.tutorial.need');
+    expect(rosieSays({ type: 'load', cargo: 'toys' }, { ...bored, cargo: 'toys' })).toBe('rosie.tutorial.load');
     // Loading the wrong thing gets the ordinary line, not "now tap Steggy".
-    expect(rosieSays({ type: 'load', cargo: 'water' }, fresh)).toBe('rosie.load.water');
+    expect(rosieSays({ type: 'load', cargo: 'water' }, { ...bored, cargo: 'water' })).toBe('rosie.load.water');
     expect(rosieSays({ type: 'deliver', species: 'stegosaurus', kind: 'bored' }, { ...fresh, needsMet: 1 })).toBe(
       'rosie.tutorial.done',
     );
     expect(rosieLines().get('rosie.tutorial.need')).toBe('Steggy is bored! Tap the toy shed!');
     expect(rosieLines().get('rosie.tutorial.load')).toBe('Now tap Steggy!');
+  });
+
+  it("follows the tutorial's arrow when the toy is loaded before Steggy is bored", () => {
+    // Nobody wants a toy yet, so there's no one to tap.
+    expect(rosieSays({ type: 'load', cargo: 'toys' }, { ...fresh, cargo: 'toys' })).toBe('rosie.load.toys');
+    // The toy is already on the jeep, so what's left is Steggy.
+    expect(rosieSays({ type: 'need', species: 'stegosaurus', kind: 'bored' }, { ...bored, cargo: 'toys' })).toBe(
+      'rosie.tutorial.load',
+    );
   });
 
   it('names each dinosaur and what to fetch for it', () => {

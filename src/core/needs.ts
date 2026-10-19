@@ -205,6 +205,18 @@ export function inTutorial(care: Care): boolean {
   return care.needsMet === 0;
 }
 
+/**
+ * What the tutorial has the child tap next: the station with the tutorial's supply, the dinosaur once it's on the
+ * jeep, or null when there's nothing to tap, before the dinosaur asks or once the tutorial is over.
+ */
+export function tutorialStep(care: Care): 'station' | 'pen' | null {
+  const tutee = care.residents.find((resident) => resident.species === TUTORIAL_NEED.species);
+  if (!inTutorial(care) || !tutee?.need) {
+    return null;
+  }
+  return care.cargo === supplyFor(TUTORIAL_NEED.kind, TUTORIAL_NEED.species) ? 'pen' : 'station';
+}
+
 /** True once a need has waited long enough to show a sad face. */
 export function isSad(need: Need): boolean {
   return need.age >= SAD_SECONDS;
