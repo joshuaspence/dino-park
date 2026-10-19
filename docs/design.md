@@ -141,9 +141,10 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   **text-to-speech clips generated once at build time and committed**, so every device sounds the
   same; recorded voices can replace them later through the same mapping. The lines are built in
   `core/rosie.ts` from the dinosaurs' names, so a new species gets its lines without new text, and
-  `scripts/generate-rosie.ts` records them with **Piper**, in an **American English** voice: Piper
-  has no Australian one. The game finds the recordings at build time and stays silent for any line
-  without one.
+  `scripts/generate-rosie.ts` records them with **Piper**, in **Cori**, a British English voice
+  (`en_GB-cori-high`, trained on public-domain LibriVox recordings): Piper has no Australian voice,
+  and of the public-domain and CC0 ones, a British woman sounds closest. The game finds the
+  recordings at build time and stays silent for any line without one.
 - **The first-play tutorial** lasts until the first need is met. Only **Steggy** wants anything,
   and she's bored: Rosie says "Steggy is bored! Tap the toy shed!", a bobbing arrow points at the
   toy shed, then at Steggy's gate once the toy is on the jeep, and Rosie cheers the delivery. Her
@@ -266,7 +267,7 @@ Each milestone is a stack of small PRs (under ~1,500 changed lines each).
 - **M1: One playable park loop.** Asset audit and import (Quaternius/Kenney, `CREDITS.md`); `core/`
   needs simulation, road graph and pathfinding, jeep kinematics, save and migrations; the park map
   with a loop road, four pens and the hay, meat, water, bath, toy and vet stations; tap-to-go,
-  hold-to-drive, keyboard and honk; chase camera; the four launch dinosaurs with need bubbles,
+  hold-to-drive, keyboard and honk; follow camera; the four launch dinosaurs with need bubbles,
   deliveries and happy animations; egg nest and hatching; the Velociraptor unlock and its gated
   area; Ranger Rosie with TTS voice lines and the first-play tutorial; music and effects; parent
   gate with volumes and reset; portrait prompt; installable and offline.

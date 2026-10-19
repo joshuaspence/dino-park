@@ -12,6 +12,9 @@ export default defineConfig({
   // CI renders in software, where loading the park and playing seconds of game time each take tens of seconds.
   // The tests that play longest call `test.slow()`, tripling this, since they run close to it.
   timeout: 90_000,
+  // Every test first waits for the models to load (`data-ready`), which on CI's software WebKit can pass the default
+  // 5 s. A longer limit only waits longer when something is slow; it never lets a wrong value through.
+  expect: { timeout: 15_000 },
   forbidOnly: !!process.env.CI,
   retries: 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',

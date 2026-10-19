@@ -33,3 +33,12 @@ Every other sound in the game is synthesised in code (`src/audio/effects.ts`). T
 | `public/audio/dinos/triceratops.mp3`  | Trixie's call        | [Pig - Multiple Snorts 2](https://freesound.org/people/JarredGibb/sounds/233183/) | [JarredGibb](https://freesound.org/people/JarredGibb/) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `public/audio/dinos/velociraptor.mp3` | the Raptors' call    | [Penguin Squeak](https://freesound.org/people/Breviceps/sounds/705839/)           | [Breviceps](https://freesound.org/people/Breviceps/)   | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | `public/audio/music/park.mp3`         | the background music | [Once Upon a Time (loop)](https://opengameart.org/content/once-upon-a-time-loop)  | [TAD](https://opengameart.org/users/tad)               | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+
+## Voice
+
+| Files                    | Used as                     | Source                                                                                                                                                        | Author                                                                                                                 | Licence                                                                                                                              |
+| ------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/assets/voice/*.mp3` | Ranger Rosie's spoken lines | Recorded with [Piper](https://github.com/rhasspy/piper)'s [`en_GB-cori-high`](https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_GB/cori/high) voice | Voice trained by [Bryce Beattie](https://brycebeattie.com/files/tts/) from [LibriVox](https://librivox.org) recordings | Recordings: public domain. Voice model: [MIT](https://huggingface.co/rhasspy/piper-voices), trained from scratch on those recordings |
+
+`scripts/generate-rosie.ts` records the lines from `src/core/rosie.ts`; re-run it with the same voice to record new
+or changed lines.
