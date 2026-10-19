@@ -121,6 +121,11 @@ function buildStation(kind: StationKind): THREE.Group {
       group.add(roof);
       break;
     }
+    case 'fish':
+      group.add(mesh(new THREE.CylinderGeometry(2.4, 2.6, 0.3, 16), 0x8a8f98, 0, 0.15, 0));
+      group.add(mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.1, 16), 0x2f7fc0, 0, 0.3, 0));
+      group.add(mesh(new THREE.ConeGeometry(0.35, 0.9, 3).rotateZ(Math.PI / 2), 0xff9a3c, 0.4, 0.5, 0));
+      break;
     case 'water':
       for (const [x, z] of [
         [-0.8, -0.8],

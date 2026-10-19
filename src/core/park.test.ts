@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { NEED_KINDS, supplyFor, visitedPlace } from './needs';
 import { MAX_REACH, PARK, type Pen, ROAD_WIDTH, penGate } from './park';
 import { type Point, findRoute, nearestRoadPosition } from './roads';
 import { LAUNCH_SPECIES } from './species';
@@ -28,9 +29,25 @@ describe('PARK', () => {
     }
   });
 
-  it('has a pen for every launch dinosaur and every kind of station', () => {
+  it('has a pen for every launch dinosaur and a station for everything they need', () => {
     expect(PARK.pens.map((pen) => pen.species).sort()).toEqual([...LAUNCH_SPECIES].sort());
-    expect(new Set(PARK.stations.map((station) => station.kind)).size).toBe(6);
+    const kinds = new Set(PARK.stations.map((station) => station.kind));
+    for (const pen of PARK.pens) {
+      for (const need of NEED_KINDS) {
+        expect(kinds).toContain(supplyFor(need, pen.species));
+      }
+    }
+  });
+
+  it('is visiting each station and pen when parked at the road nearest it', () => {
+    for (const station of PARK.stations) {
+      const stop = nearestRoadPosition(PARK.roads, station.position).point;
+      expect(visitedPlace(PARK, stop)?.station).toBe(station);
+    }
+    for (const pen of PARK.pens) {
+      const stop = nearestRoadPosition(PARK.roads, penGate(pen)).point;
+      expect(visitedPlace(PARK, stop)?.pen).toBe(pen);
+    }
   });
 
   it('puts every pen gate and station within reach of a road', () => {

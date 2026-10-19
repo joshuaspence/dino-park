@@ -2,7 +2,7 @@ import type { Point, RoadGraph } from './roads';
 import type { SpeciesId } from './species';
 
 /** Where the jeep picks up each kind of supply (docs/design.md §3). */
-export type StationKind = 'hay' | 'meat' | 'water' | 'bath' | 'toys' | 'vet';
+export type StationKind = 'hay' | 'meat' | 'fish' | 'water' | 'bath' | 'toys' | 'vet';
 
 export interface Station {
   readonly kind: StationKind;
