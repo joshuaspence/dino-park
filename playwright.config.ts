@@ -10,6 +10,7 @@ const tablet = { viewport: { width: 1180, height: 820 }, hasTouch: true };
 export default defineConfig({
   testDir: 'tests/e2e',
   // CI renders in software, where loading the park and playing seconds of game time each take tens of seconds.
+  // The tests that play longest call `test.slow()`, tripling this, since they run close to it.
   timeout: 90_000,
   forbidOnly: !!process.env.CI,
   retries: 0,

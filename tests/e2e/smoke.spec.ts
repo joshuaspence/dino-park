@@ -135,6 +135,7 @@ test('loads the toy shed when the jeep stops there', async ({ page }) => {
 });
 
 test('saves a hatched egg and remembers it after a reload', async ({ page }) => {
+  test.slow();
   await page.clock.install();
   await page.goto('./');
   // A park whose first egg is full, as if five needs had been met.
@@ -211,6 +212,7 @@ test('drives with the arrow keys and honks with Space', async ({ page }) => {
 });
 
 test('draws the camera in on a hatch, then back to the jeep', async ({ page }) => {
+  test.slow();
   await page.clock.install();
   await page.goto('./');
   await savedPark(page, { version: 1, needsMet: 5, eggsHatched: 0 });
@@ -449,6 +451,7 @@ test('sets and remembers the volumes in the parent area', async ({ page }) => {
 });
 
 test('resets the park from the parent area, after asking', async ({ page }) => {
+  test.slow();
   await page.clock.install();
   await page.goto('./');
   await savedPark(page, { version: 1, needsMet: 7, eggsHatched: 1 });
