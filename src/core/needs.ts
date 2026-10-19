@@ -153,7 +153,7 @@ export function stepNeeds(care: Care, park: Park, jeep: JeepAt, seconds: number)
   // demand. Until the first need is met, the first-play tutorial keeps it to one at a time.
   const tutorial = inTutorial(care);
   const full = care.residents.filter((resident) => resident.need).length >= (tutorial ? 1 : MAX_NEEDS);
-  // A dinosaur still waiting to hatch can't want anything yet, and its meters stay full.
+  // A dinosaur still waiting to hatch can't want anything yet, and its meters hold at their starting levels.
   const inPark = speciesInPark(eggsHatched);
   let residents = care.residents.map((resident) => ({
     ...resident,
