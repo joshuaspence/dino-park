@@ -950,14 +950,15 @@ test('after a drink is delivered, the child gives it to the dinosaur by hand', a
   await expect(canvas).toHaveAttribute('data-bites', '1');
   // A drag to his mouth does too, and a drag that misses floats back.
   const box = await canvas.boundingBox();
-  const drag = async (to: { x: number; y: number }) => {
+  /** Drags the food to `to` in `steps` moves: many small ones are a slow drag. */
+  const drag = async (to: { x: number; y: number }, steps = 8) => {
     const from = await point('data-food');
     await page.mouse.move((box?.x ?? 0) + from.x, (box?.y ?? 0) + from.y);
     await page.mouse.down();
-    for (let step = 1; step <= 8; step++) {
+    for (let step = 1; step <= steps; step++) {
       await page.mouse.move(
-        (box?.x ?? 0) + from.x + ((to.x - from.x) * step) / 8,
-        (box?.y ?? 0) + from.y + ((to.y - from.y) * step) / 8,
+        (box?.x ?? 0) + from.x + ((to.x - from.x) * step) / steps,
+        (box?.y ?? 0) + from.y + ((to.y - from.y) * step) / steps,
       );
       await page.clock.fastForward(30);
     }
@@ -965,6 +966,9 @@ test('after a drink is delivered, the child gives it to the dinosaur by hand', a
     await playFor(page, 600);
   };
   await drag(at(0.95, 0.9));
+  await expect(canvas).toHaveAttribute('data-bites', '1');
+  // However slowly.
+  await drag(at(0.95, 0.9), 80);
   await expect(canvas).toHaveAttribute('data-bites', '1');
   // A press the browser takes over (an edge swipe, palm rejection) lets go of it too, so it can be picked up again.
   const held = await point('data-food');

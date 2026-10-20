@@ -541,8 +541,20 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     }
   }
 
-  /** The finger or button down on the park. `feeding` when it picked up a close-up's food. */
-  let press: { id: number; x: number; y: number; at: number; holding: boolean; feeding: boolean } | null = null;
+  /**
+   * The finger or button down on the park: where it is now and where it went down. `feeding` when it picked up a
+   * close-up's food.
+   */
+  let press: {
+    id: number;
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    at: number;
+    holding: boolean;
+    feeding: boolean;
+  } | null = null;
   /** The last tap, to tell a double tap. */
   let lastTap: { x: number; y: number; at: number } | null = null;
   /** The dinosaur whose card is open, which the camera keeps in view, and the fact Rosie told last. */
@@ -597,6 +609,8 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       id: event.pointerId,
       x: event.clientX,
       y: event.clientY,
+      startX: event.clientX,
+      startY: event.clientY,
       at: performance.now(),
       holding: false,
       feeding: feeds,
@@ -609,7 +623,8 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     if (!press || event.pointerId !== press.id) {
       return;
     }
-    if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > TAP_SLOP_PX) {
+    // Measured from where it went down, so a slow drag, made of many small moves, still stops being a tap.
+    if (Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > TAP_SLOP_PX) {
       press.holding = true;
     }
     press.x = event.clientX;
