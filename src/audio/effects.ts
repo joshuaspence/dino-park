@@ -93,6 +93,29 @@ export function playGiggle(mixer: Mixer): void {
   );
 }
 
+/** A munch for a bite in a feeding close-up: three soft, crunchy chomps. */
+export function playMunch(mixer: Mixer): void {
+  const { context } = mixer;
+  const at = context.currentTime;
+  const length = Math.ceil(context.sampleRate * 0.08);
+  const noise = context.createBuffer(1, length, context.sampleRate);
+  const samples = noise.getChannelData(0);
+  for (let i = 0; i < length; i++) {
+    samples[i] = (Math.random() * 2 - 1) * (1 - i / length);
+  }
+  for (const chomp of [0, 0.16, 0.32]) {
+    const source = context.createBufferSource();
+    source.buffer = noise;
+    const tone = context.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 900;
+    const gain = context.createGain();
+    gain.gain.value = 0.35;
+    source.connect(tone).connect(gain).connect(mixer.buses.effects);
+    source.start(at + chomp);
+  }
+}
+
 /** An eggshell crack, then a fanfare with a sparkle on top, for a hatch. */
 export function playHatch(mixer: Mixer): void {
   const { context } = mixer;

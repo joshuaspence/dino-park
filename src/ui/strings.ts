@@ -56,4 +56,6 @@ export const strings = {
   installed: 'Dino Park is installed on this device. Look for “Dino Park” in your apps.',
   version: 'Version',
   close: 'Close',
+  /** Read aloud by screen readers only: leaving a close-up (docs/design.md §3) is a picture of a cross. */
+  backToPark: 'Back to the park',
 } as const;
