@@ -20,7 +20,6 @@ import { MeshoptEncoder } from 'meshoptimizer';
 // Pack file name → model ID used by the game.
 const MODELS = {
   Apatosaurus: 'apatosaurus',
-  Parasaurolophus: 'parasaurolophus',
   Stegosaurus: 'stegosaurus',
   Trex: 'trex',
   Triceratops: 'triceratops',

@@ -13,10 +13,11 @@ import { type Beat, type Focus, type LineId, rosieOnCard, rosieSays, welcomeLine
 import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
-import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, UNLOCK_ORDER, speciesInPark } from '../core/species';
+import { LAUNCH_SPECIES, SPECIES, type SpeciesId, UNLOCK_ORDER, speciesInPark } from '../core/species';
 import { nextHint } from '../core/help';
 import { holdUntilDriven, tourStep } from '../core/tour';
 import { type DinoInstance, type DinoSkin, loadDinoSkin } from './dinoSkin';
+import { buildRosie } from './rosieModel';
 import { cargoIcon, iconMaterial, needIcon, stationIcon } from './icons';
 import { buildJeep } from './jeepModel';
 import { loadPark, storePark } from '../storage/parkStore';
@@ -397,14 +398,13 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   async function populate(): Promise<void> {
     // Fetch every pen's model alongside the save, rather than after it: a stand-in baby is one of the same models.
     const models = PARK.pens.flatMap((pen) => SPECIES[pen.species].model ?? []);
-    const [saved, rosieSkin] = await Promise.all([loadPark(), skinFor(ROSIE_MODEL), ...models.map(skinFor)]);
+    const [saved] = await Promise.all([loadPark(), ...models.map(skinFor)]);
     if (disposed) {
       return;
     }
     care = resumeCare(PARK, saved === 'newer' ? null : saved);
     canSave = saved !== 'newer';
     loaded = true;
-    const rosie = rosieSkin.create();
     const inPark = speciesInPark(care.eggsHatched);
     const residents = await Promise.all(
       PARK.pens
@@ -414,8 +414,9 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
           return { pen, skin: model ? await skinFor(model) : null };
         }),
     );
-    // Rosie rides standing in the back of the jeep.
-    rosie.object.scale.multiplyScalar(0.6);
+    // Rosie rides standing in the back of the jeep, larger than life like the dinosaurs so she reads from the camera.
+    const rosie = buildRosie();
+    rosie.object.scale.setScalar(1.5);
     rosie.object.position.set(0, 1.3, -0.9);
     jeepModel.add(rosie.object);
     dinos.push(rosie);

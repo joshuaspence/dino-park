@@ -1,16 +1,22 @@
-/** Ranger Rosie's face, a Parasaurolophus in a ranger hat: the help button, and her own info card. */
+/** Ranger Rosie's face, a park ranger in a wide-brimmed hat: the help button, and her own info card. */
 export function RosieFace() {
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true">
-      <path d="M28 24 Q14 6 5 9 Q2 14 9 17 Q19 20 24 31 Z" fill="#2e8f80" />
-      <ellipse cx="34" cy="37" rx="15" ry="13" fill="#3bb3a0" />
-      <ellipse cx="47" cy="41" rx="11" ry="8" fill="#3bb3a0" />
-      <circle cx="37" cy="33" r="3.2" fill="#222" />
-      <circle cx="38" cy="32" r="1" fill="#fff" />
-      <path d="M44 47 Q50 50 56 45" fill="none" stroke="#1f5f55" strokeWidth="2.5" strokeLinecap="round" />
-      <path d="M22 24 Q24 11 33 11 Q42 11 44 24 Z" fill="#c9924d" />
-      <rect x="22.5" y="19" width="21" height="4" fill="#7a4f22" />
-      <ellipse cx="33" cy="24.5" rx="17" ry="3.5" fill="#b07a3c" />
+      <ellipse cx="32" cy="38" rx="19" ry="19" fill="#5a3825" />
+      <ellipse cx="50" cy="46" rx="5" ry="9" fill="#5a3825" />
+      <circle cx="32" cy="39" r="15" fill="#e8b48a" />
+      <path d="M17 34 Q20 25 32 26 Q44 25 47 34 Q40 30 32 31 Q24 30 17 34 Z" fill="#5a3825" />
+      <circle cx="26.5" cy="39" r="2.6" fill="#222" />
+      <circle cx="37.5" cy="39" r="2.6" fill="#222" />
+      <circle cx="27.3" cy="38.2" r="0.8" fill="#fff" />
+      <circle cx="38.3" cy="38.2" r="0.8" fill="#fff" />
+      <ellipse cx="22.5" cy="44" rx="3" ry="1.8" fill="#f0907a" />
+      <ellipse cx="41.5" cy="44" rx="3" ry="1.8" fill="#f0907a" />
+      <path d="M27 46 Q32 51 37 46" fill="none" stroke="#8a3b2b" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M20 26 L26 10 Q32 6 38 10 L44 26 Z" fill="#c9924d" />
+      <path d="M29 9 L32 17 L35 9" fill="none" stroke="#a87638" strokeWidth="1.5" strokeLinejoin="round" />
+      <rect x="21" y="21" width="22" height="4" fill="#7a4f22" />
+      <ellipse cx="32" cy="26" rx="25" ry="4.5" fill="#b07a3c" />
     </svg>
   );
 }

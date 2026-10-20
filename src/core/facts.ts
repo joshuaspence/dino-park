@@ -78,13 +78,13 @@ export const SPECIES_FACTS: Readonly<Record<SpeciesId, SpeciesFacts>> = {
   },
 };
 
-/** Ranger Rosie herself, a Parasaurolophus, for her own card. */
+/** Ranger Rosie herself, a park ranger, for her own card: what a ranger does, in place of a species' facts. */
 export const ROSIE_FACTS: SpeciesFacts = {
-  name: 'Parasaurolophus',
-  spoken: 'a Parasaurolophus',
+  name: 'Park ranger',
+  spoken: 'a park ranger',
   facts: [
-    'Parasaurolophus had a long hollow crest, and could honk through it like a trumpet!',
-    'Parasaurolophus was a duck-billed dinosaur that ate plants.',
-    'Parasaurolophus could walk on two legs, or on all four.',
+    'Park rangers look after the animals and plants in a park, and keep everyone safe!',
+    'My big ranger hat keeps the sun and the rain off my face!',
+    "Rangers help visitors learn all about the animals, just like I'm helping you!",
   ],
 };

@@ -905,7 +905,7 @@ test('a double tap opens a card about a station, the egg nest or Rosie', async (
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.about.rosie rosie.fact.rosie.0');
   await rosie.getByRole('button', { name: strings.anotherFact }).click();
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.fact.rosie.1');
-  await expect(rosie.getByText(/duck-billed/)).toBeVisible();
+  await expect(rosie.getByText(/sun and the rain/)).toBeVisible();
 });
 
 test("Rosie's picture wiggles when the player is stuck, and shows them what to do", async ({ page }) => {

@@ -32,7 +32,6 @@ const PALETTES: Record<string, Record<string, number>> = {
   stegosaurus: { DarkBrown: 0xf7c843, Brown: 0xe8604c, LightBrown: 0xfdf0c2 },
   trex: { Green: 0x3fae5a, LightGreen: 0x8fdc7a, LightYellow: 0xfbe6a2, Red: 0xff8fa3, Black: 0x222222 },
   velociraptor: { Brown: 0xa77de8, LightBrown: 0xe6d6ff, Black: 0x222222 },
-  parasaurolophus: { Green: 0x48c0a8, LightGreen: 0xa6ecd9, LightYellow: 0xfbe6a2, Red: 0xff7a59 },
 };
 
 /** How long, in seconds, clips take to blend into each other. */
@@ -44,9 +43,6 @@ const FADE_SECONDS = 0.25;
  * because big, readable dinosaurs matter more to small children than true scale.
  */
 const MODEL_SCALE = 0.25;
-
-/** Per-model adjustments on top of MODEL_SCALE: the pack's Parasaurolophus is too small to be Rosie. */
-const SCALE_ADJUSTMENTS: Record<string, number> = { parasaurolophus: 1.8 };
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 
@@ -78,7 +74,7 @@ export async function loadDinoSkin(model: string): Promise<DinoSkin> {
   return {
     create() {
       const object = cloneSkinned(gltf.scene);
-      object.scale.setScalar(MODEL_SCALE * (SCALE_ADJUSTMENTS[model] ?? 1));
+      object.scale.setScalar(MODEL_SCALE);
       const mixer = new THREE.AnimationMixer(object);
       let current: THREE.AnimationAction | null = null;
 
