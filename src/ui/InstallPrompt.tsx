@@ -34,7 +34,7 @@ window.addEventListener('appinstalled', () => {
   setState('installed');
 });
 // The manifest lists the game as its own related app, so Chrome on Android can say whether it's installed: Chrome's
-// menu then offers to open the app, which is easy to miss (docs/design.md §10).
+// menu then offers to open the app, which is easy to miss (docs/design.md §11).
 (navigator as Navigator & { getInstalledRelatedApps?: () => Promise<readonly unknown[]> })
   .getInstalledRelatedApps?.()
   .then((apps) => {
