@@ -772,6 +772,23 @@ test('Rosie walks a new player through their first delivery, showing them each p
 });
 
 /**
+ * Pauses the installed clock a little ahead of the page's time. The pause has to be in the page's future, which keeps
+ * moving while the call is under way, so it allows a margin and tries again if a slow runner overtakes even that.
+ */
+async function pauseClock(page: Page): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 10_000);
+      return;
+    } catch (error) {
+      if (attempt >= 2) {
+        throw error;
+      }
+    }
+  }
+}
+
+/**
  * Opens a park past the guided tour, with the clock paused, and returns the canvas and a position on it as fractions of
  * its size.
  */
@@ -784,7 +801,7 @@ async function openPlayedPark(page: Page) {
   await expect(canvas).toHaveAttribute('data-ready', 'true');
   // An installed clock still runs in real time, and CI's software WebKit can take seconds over a dblclick, leaving its
   // two clicks further apart than a double tap. Paused, game time moves only when the test plays it.
-  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
+  await pauseClock(page);
   const box = await canvas.boundingBox();
   if (!box) {
     throw new Error('Canvas has no size');
