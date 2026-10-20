@@ -29,6 +29,16 @@ describe('close-ups', () => {
     });
   });
 
+  it('washes the mud off after the bubble bath', () => {
+    expect(closeUpAfter({ type: 'deliver', species: 'stegosaurus', kind: 'dirty' }, played)).toEqual({
+      kind: 'wash',
+      species: 'stegosaurus',
+      item: 'bath',
+      done: 0,
+      idle: 0,
+    });
+  });
+
   it('opens for nothing else, nor for the tour', () => {
     expect(closeUpAfter({ type: 'deliver', species: 'trex', kind: 'poorly' }, played)).toBeNull();
     expect(closeUpAfter({ type: 'load', cargo: 'meat' }, played)).toBeNull();

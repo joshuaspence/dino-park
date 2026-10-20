@@ -136,6 +136,9 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
       lines.set(`rosie.feed.${species}.${item}`, `Let's ${offer}! Drag ${FEED_ITEMS[item] ?? ''} to ${resident}!`);
     }
     lines.set(`rosie.fed.${species}`, `Yum! ${name} ${verb === 'are' ? 'love' : 'loves'} it!`);
+    // Washing the mud off, after the bubble bath.
+    lines.set(`rosie.wash.${species}`, `Let's wash ${resident}! Rub the mud off!`);
+    lines.set(`rosie.washed.${species}`, `Sparkly clean! ${name} ${verb === 'are' ? 'love' : 'loves'} a bath!`);
   }
   for (const [kind, supply] of Object.entries(SUPPLIES)) {
     lines.set(`rosie.load.${kind}`, `Got ${supply}!`);
@@ -216,7 +219,11 @@ export function rosieOnCard(subject: Subject, care: Care, fact: number): readonl
 
 /** What Rosie says as a close-up starts, to say what to do, and once it's finished. */
 export function rosieOnCloseUp(closeUp: CloseUp): LineId {
-  return closeUpFinished(closeUp) ? `rosie.fed.${closeUp.species}` : `rosie.feed.${closeUp.species}.${closeUp.item}`;
+  const { kind, species, item } = closeUp;
+  if (kind === 'wash') {
+    return closeUpFinished(closeUp) ? `rosie.washed.${species}` : `rosie.wash.${species}`;
+  }
+  return closeUpFinished(closeUp) ? `rosie.fed.${species}` : `rosie.feed.${species}.${item}`;
 }
 
 /** What Rosie says when the game starts: a hello for a new park, a welcome back for one with progress. */

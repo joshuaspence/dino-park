@@ -96,6 +96,10 @@ score.**
     jeep and the dinosaur; the child drags it to its mouth (or just taps it, for children who
     can't drag yet) and it munches and hops. Three bites and Rosie says it loves it ("Yum! Bruno
     loves it!").
+  - **Washing**, after the bubble bath. Five splats of mud sit along the dinosaur's back; the
+    child rubs each one off with a sponge that follows their finger, in a froth of bubbles (two
+    taps on a splat do it too). All clean, and Rosie says so ("Sparkly clean! Steggy loves a
+    bath!").
 
 ## 4. Driving, controls and camera
 
@@ -355,5 +359,5 @@ Each milestone is a stack of small PRs (under ~1,500 changed lines each).
 - **M2: More park.** Pterodactyl aviary and fish pond; Ankylosaurus and further unlocks; baby
   dinosaurs; the bedtime timer; automatic quality steps verified on real budget tablets.
 - **M3: Polish and family.** Sibling profiles; day/night and weather; jeep colour choice;
-  more close-ups (brush or wash a dinosaur) after feeding by hand.
+  close-ups (feeding by hand and washing are in).
 - **Later:** recorded voices replacing TTS, translations, a Capacitor App Store wrapper.
