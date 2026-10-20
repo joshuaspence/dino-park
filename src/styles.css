@@ -275,6 +275,10 @@ body,
   gap: 0.5rem;
 }
 
+.parent-install button {
+  margin-left: 0.25rem;
+}
+
 .parent-version {
   font-size: 0.85rem;
   opacity: 0.7;
