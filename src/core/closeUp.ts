@@ -46,6 +46,11 @@ export function stepCloseUp(closeUp: CloseUp, seconds: number): CloseUp | null {
   return idle >= CLOSE_UP_IDLE_SECONDS ? null : { ...closeUp, idle };
 }
 
+/** `closeUp` after the child does anything in it, so a child still trying isn't sent back to the park. */
+export function touchCloseUp(closeUp: CloseUp): CloseUp {
+  return { ...closeUp, idle: 0 };
+}
+
 /** `closeUp` after the child does its thing once more. */
 export function progressCloseUp(closeUp: CloseUp): CloseUp {
   return { ...closeUp, done: Math.min(closeUp.done + 1, CLOSE_UP_GOALS[closeUp.kind]), idle: 0 };

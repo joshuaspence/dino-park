@@ -7,6 +7,7 @@ import {
   closeUpFinished,
   progressCloseUp,
   stepCloseUp,
+  touchCloseUp,
 } from './closeUp';
 import { startCare } from './needs';
 import { PARK } from './park';
@@ -54,5 +55,16 @@ describe('close-ups', () => {
     expect(closeUp).toMatchObject({ done: CLOSE_UP_GOALS.feed, idle: 0 });
     expect(closeUp && closeUpFinished(closeUp)).toBe(true);
     expect(closeUp && stepCloseUp(closeUp, CLOSE_UP_IDLE_SECONDS)).toBeNull();
+  });
+
+  it("isn't left alone while the child keeps trying", () => {
+    let closeUp = closeUpAfter({ type: 'deliver', species: 'trex', kind: 'hungry' }, played);
+    if (!closeUp) {
+      throw new Error('No close-up');
+    }
+    closeUp = stepCloseUp(closeUp, CLOSE_UP_IDLE_SECONDS - 1);
+    closeUp = closeUp && touchCloseUp(closeUp);
+    expect(closeUp).toMatchObject({ done: 0, idle: 0 });
+    expect(closeUp && stepCloseUp(closeUp, CLOSE_UP_IDLE_SECONDS - 1)).not.toBeNull();
   });
 });

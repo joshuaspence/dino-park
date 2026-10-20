@@ -27,7 +27,14 @@ import {
   stepNeeds,
 } from '../core/needs';
 import { PAT_SECONDS, PAT_TALK_SECONDS, patAt } from '../core/pat';
-import { type CloseUp, closeUpAfter, closeUpFinished, progressCloseUp, stepCloseUp } from '../core/closeUp';
+import {
+  type CloseUp,
+  closeUpAfter,
+  closeUpFinished,
+  progressCloseUp,
+  stepCloseUp,
+  touchCloseUp,
+} from '../core/closeUp';
 import { type Subject, subjectAt, subjectKey, subjectPoint } from '../core/inspect';
 import { type Beat, type Focus, type LineId, rosieOnCard, rosieOnCloseUp, rosieSays, welcomeLine } from '../core/rosie';
 import { resumeCare, savePark } from '../core/save';
@@ -604,6 +611,9 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     // release, so `onPointerUp` unlocks too.
     mixer.unlock();
     canvas.setPointerCapture(event.pointerId);
+    if (closeUp) {
+      closeUp = touchCloseUp(closeUp);
+    }
     const feeds = closeUp !== null && feeding.press(event.clientX, event.clientY);
     press = {
       id: event.pointerId,
@@ -754,9 +764,9 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
         endCloseUp();
       }
     }
-    // Left alone, it ends by itself.
+    // Left alone, it ends by itself; a press, or food held, isn't left alone.
     if (closeUp) {
-      const next = stepCloseUp(closeUp, delta);
+      const next = stepCloseUp(press?.feeding ? touchCloseUp(closeUp) : closeUp, delta);
       if (!next) {
         endCloseUp();
       }
