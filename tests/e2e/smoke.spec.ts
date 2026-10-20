@@ -987,6 +987,51 @@ test('Rosie holds what she has to say until sound starts', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-rosie', `rosie.need.${need.replace(':', '.')}`);
 });
 
+test('has a web app manifest for installing, which knows the game is itself', async ({ page, request }) => {
+  await page.goto('./');
+  const href = await page.locator('link[rel="manifest"]').getAttribute('href');
+  const response = await request.get(new URL(href ?? '', page.url()).href);
+  expect(await response.json()).toMatchObject({
+    name: 'Dino Park',
+    id: '/dino-park/',
+    start_url: '/dino-park/',
+    scope: '/dino-park/',
+    display: 'fullscreen',
+    related_applications: [
+      { platform: 'webapp', url: 'https://joshuaspence.github.io/dino-park/manifest.webmanifest' },
+    ],
+  });
+});
+
+test('offers a grown-up to install the game when the browser allows it, then says where to find it', async ({
+  page,
+}) => {
+  await page.clock.install();
+  await page.goto('./');
+  await expect(page.locator('canvas.world')).toHaveAttribute('data-ready', 'true');
+  await openParentArea(page);
+  // Nothing until the browser offers to install.
+  const install = page.getByRole('button', { name: strings.install });
+  await expect(install).toHaveCount(0);
+
+  await page.evaluate(() => {
+    const offer = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), {
+      prompt: () => {
+        (window as unknown as { prompted: boolean }).prompted = true;
+        return Promise.resolve();
+      },
+    });
+    window.dispatchEvent(offer);
+  });
+  await expect(page.getByText(strings.installOffer)).toBeVisible();
+  await install.click();
+  expect(await page.evaluate(() => (window as unknown as { prompted?: boolean }).prompted)).toBe(true);
+  await expect(install).toHaveCount(0);
+
+  await page.evaluate(() => window.dispatchEvent(new Event('appinstalled')));
+  await expect(page.getByRole('status')).toHaveText(strings.installed);
+});
+
 test('plays offline once it has loaded', async ({ page, context }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));

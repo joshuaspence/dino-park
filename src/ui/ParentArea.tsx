@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { BEDTIME_CHOICES, type BedtimeMinutes } from '../core/bedtime';
 import { BUSES, type Bus, type Settings } from '../core/settings';
+import { InstallPrompt } from './InstallPrompt';
 import { strings } from './strings';
 
 /** How long a grown-up holds the lock before the gate asks its question (docs/design.md §7). */
@@ -55,7 +56,8 @@ const numberWord = (question: Question) => strings.numberWords[question.answer -
 
 /**
  * The grown-up gate and the parent area behind it: a quiet lock in the corner that opens only after a 3-second hold
- * and a number named in words, then volumes, the bedtime timer, a park reset and the version.
+ * and a number named in words, then volumes, the bedtime timer, a park reset, an offer to install the game and the
+ * version.
  */
 export function ParentArea({ settings, onVolume, onBedtime, onWake, onReset }: Props) {
   const [stage, setStage] = useState<Stage>({ name: 'closed' });
@@ -181,6 +183,7 @@ export function ParentArea({ settings, onVolume, onBedtime, onWake, onReset }: P
               {strings.reset}
             </button>
           )}
+          <InstallPrompt />
           <p className="parent-version">
             {strings.version} {__APP_VERSION__} · {__GIT_SHA__}
           </p>

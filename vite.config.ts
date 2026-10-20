@@ -33,6 +33,11 @@ export default defineConfig({
         short_name: 'Dino Park',
         description: 'Drive around a dinosaur park and look after the dinosaurs.',
         lang: 'en-AU',
+        // Set rather than defaulted, so installs stay the same app even if the start URL changes, and apart from
+        // other apps on joshuaspence.github.io.
+        id: '/dino-park/',
+        start_url: '/dino-park/',
+        scope: '/dino-park/',
         display: 'fullscreen',
         orientation: 'landscape',
         background_color: '#bfe9a8',
@@ -43,6 +48,10 @@ export default defineConfig({
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+        // Itself, so the game can ask Chrome whether it's already installed (src/ui/InstallPrompt.tsx).
+        related_applications: [
+          { platform: 'webapp', url: 'https://joshuaspence.github.io/dino-park/manifest.webmanifest' },
         ],
       },
       workbox: {

@@ -314,6 +314,13 @@ tests/e2e/    Playwright
 - **Every merge to `master` deploys** to GitHub Pages. No tagged releases.
 - A new service worker waits and applies on the **next launch**; the game never reloads in the
   middle of play.
+- **Install offer.** Chrome's own install banner shows only now and then, and its menu item is easy
+  to miss, so the parent area offers **Install** whenever the browser allows it
+  (`beforeinstallprompt`). It's behind the grown-up gate, so a child never meets it. Once
+  installed, the manifest's `related_applications` (the game itself) lets Chrome on Android say so,
+  and the parent area says to look for "Dino Park" in the apps. Browsers that don't say (Safari,
+  Firefox) show nothing, nor does the installed app, which runs full screen. The manifest's `id` is
+  set to the start URL, so the game stays apart from other apps on `joshuaspence.github.io`.
 
 ## 12. Milestones
 

@@ -51,6 +51,9 @@ export const strings = {
   resetConfirm: 'This clears every egg and dinosaur hatched so far, and starts the park again.',
   resetAsk: (number: string) => `To reset it, tap the number ${number}.`,
   resetNo: 'No, keep it',
+  installOffer: 'Put Dino Park on this device, to play it like any other app.',
+  install: 'Install',
+  installed: 'Dino Park is installed on this device. Look for “Dino Park” in your apps.',
   version: 'Version',
   close: 'Close',
 } as const;
