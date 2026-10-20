@@ -1,4 +1,4 @@
-import { type Care, type CareEvent, inTutorial, supplyFor } from './needs';
+import { type Care, type CareEvent, type NeedKind, inTutorial, supplyFor } from './needs';
 import type { StationKind } from './park';
 import type { SpeciesId } from './species';
 
@@ -7,34 +7,44 @@ import type { SpeciesId } from './species';
  * The delivery has already met the need, so a close-up is all reward: it can't be got wrong, it ends by itself once
  * done or left alone, and a grown-up or child can leave it at any time.
  */
-export type CloseUpKind = 'feed' | 'wash';
+export type CloseUpKind = 'feed' | 'wash' | 'fetch';
 
 export interface CloseUp {
   readonly kind: CloseUpKind;
   readonly species: SpeciesId;
   /** What the child gives it: the supply just delivered. */
   readonly item: StationKind;
-  /** Bites taken, or mud splats washed off, so far. */
+  /** Bites taken, mud splats washed off, or balls fetched, so far. */
   readonly done: number;
   /** Seconds since the child last did anything in it. */
   readonly idle: number;
 }
 
 /** How many times the child does the close-up's one thing before it's finished. */
-export const CLOSE_UP_GOALS: Readonly<Record<CloseUpKind, number>> = { feed: 3, wash: 5 };
+export const CLOSE_UP_GOALS: Readonly<Record<CloseUpKind, number>> = { feed: 3, wash: 5, fetch: 3 };
 
 /** A close-up left alone this long, in seconds, ends by itself, so a child who wanders off finds the park. */
 export const CLOSE_UP_IDLE_SECONDS = 15;
 
+/** The close-up each need opens once it's met, if any. */
+const KINDS: Readonly<Record<NeedKind, CloseUpKind | null>> = {
+  hungry: 'feed',
+  thirsty: 'feed',
+  dirty: 'wash',
+  bored: 'fetch',
+  poorly: null,
+};
+
 /**
  * The close-up a care event opens, if any: feeding by hand after food or a drink is delivered, and washing off the
- * mud after the bubble bath. Not for the tour's delivery, which goes on to explain the egg.
+ * mud after the bubble bath, and a game of fetch after a toy. Not for the tour's delivery, which goes on to explain the
+ * egg.
  */
 export function closeUpAfter(event: CareEvent, after: Care): CloseUp | null {
   if (event.type !== 'deliver' || inTutorial({ ...after, needsMet: after.needsMet - 1 })) {
     return null;
   }
-  const kind = event.kind === 'hungry' || event.kind === 'thirsty' ? 'feed' : event.kind === 'dirty' ? 'wash' : null;
+  const kind = KINDS[event.kind];
   return kind && { kind, species: event.species, item: supplyFor(event.kind, event.species), done: 0, idle: 0 };
 }
 

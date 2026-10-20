@@ -39,6 +39,13 @@ describe('close-ups', () => {
     });
   });
 
+  it('plays fetch after a toy', () => {
+    expect(closeUpAfter({ type: 'deliver', species: 'trex', kind: 'bored' }, played)).toMatchObject({
+      kind: 'fetch',
+      item: 'toys',
+    });
+  });
+
   it('opens for nothing else, nor for the tour', () => {
     expect(closeUpAfter({ type: 'deliver', species: 'trex', kind: 'poorly' }, played)).toBeNull();
     expect(closeUpAfter({ type: 'load', cargo: 'meat' }, played)).toBeNull();

@@ -140,6 +140,11 @@ describe('Ranger Rosie', () => {
     const washing = { kind: 'wash', species: 'stegosaurus', item: 'bath', done: 0, idle: 0 } as const;
     expect(rosieOnCloseUp(washing)).toBe('rosie.wash.stegosaurus');
     expect(rosieOnCloseUp({ ...washing, done: 5 })).toBe('rosie.washed.stegosaurus');
+    expect(lines.get('rosie.fetch.trex')).toBe("Let's play fetch with Rex! Tap where to throw the ball!");
+    expect(lines.get('rosie.fetched.velociraptor')).toBe('Good catch! The Raptors love playing fetch!');
+    const fetching = { kind: 'fetch', species: 'trex', item: 'toys', done: 0, idle: 0 } as const;
+    expect(rosieOnCloseUp(fetching)).toBe('rosie.fetch.trex');
+    expect(rosieOnCloseUp({ ...fetching, done: 3 })).toBe('rosie.fetched.trex');
     // Every species has a line for every food it eats, and for water.
     for (const species of [...LAUNCH_SPECIES, ...UNLOCK_ORDER]) {
       for (const kind of ['hungry', 'thirsty'] as const) {

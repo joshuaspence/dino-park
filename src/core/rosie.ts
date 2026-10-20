@@ -139,6 +139,9 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
     // Washing the mud off, after the bubble bath.
     lines.set(`rosie.wash.${species}`, `Let's wash ${resident}! Rub the mud off!`);
     lines.set(`rosie.washed.${species}`, `Sparkly clean! ${name} ${verb === 'are' ? 'love' : 'loves'} a bath!`);
+    // Fetch, after a toy.
+    lines.set(`rosie.fetch.${species}`, `Let's play fetch with ${resident}! Tap where to throw the ball!`);
+    lines.set(`rosie.fetched.${species}`, `Good catch! ${name} ${verb === 'are' ? 'love' : 'loves'} playing fetch!`);
   }
   for (const [kind, supply] of Object.entries(SUPPLIES)) {
     lines.set(`rosie.load.${kind}`, `Got ${supply}!`);
@@ -222,6 +225,9 @@ export function rosieOnCloseUp(closeUp: CloseUp): LineId {
   const { kind, species, item } = closeUp;
   if (kind === 'wash') {
     return closeUpFinished(closeUp) ? `rosie.washed.${species}` : `rosie.wash.${species}`;
+  }
+  if (kind === 'fetch') {
+    return closeUpFinished(closeUp) ? `rosie.fetched.${species}` : `rosie.fetch.${species}`;
   }
   return closeUpFinished(closeUp) ? `rosie.fed.${species}` : `rosie.feed.${species}.${item}`;
 }

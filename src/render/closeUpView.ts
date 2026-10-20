@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 
-import type { StationKind } from '../core/park';
+import type { Pen, StationKind } from '../core/park';
 import type { DinoInstance } from './dinoSkin';
 
 /** What a close-up (docs/design.md §3) shows and does, in the scene, while the camera is in on its dinosaur. */
 export interface CloseUpView {
-  /** Starts it for `herd`, given `item` and with the pen gate, where the jeep waits, at `gate`. */
-  start(herd: readonly DinoInstance[], item: StationKind, gate: THREE.Vector3): void;
+  /** Starts it for `herd`, given `item`, in `pen`, at whose gate the jeep waits. */
+  start(herd: readonly DinoInstance[], item: StationKind, pen: Pen): void;
   stop(): void;
   /** A press at `clientX`, `clientY`: whether the close-up takes it. */
   press(clientX: number, clientY: number): boolean;
