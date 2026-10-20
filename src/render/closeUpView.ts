@@ -1,0 +1,84 @@
+import * as THREE from 'three';
+
+import type { StationKind } from '../core/park';
+import type { DinoInstance } from './dinoSkin';
+
+/** What a close-up (docs/design.md §3) shows and does, in the scene, while the camera is in on its dinosaur. */
+export interface CloseUpView {
+  /** Starts it for `herd`, given `item` and with the pen gate, where the jeep waits, at `gate`. */
+  start(herd: readonly DinoInstance[], item: StationKind, gate: THREE.Vector3): void;
+  stop(): void;
+  /** A press at `clientX`, `clientY`: whether the close-up takes it. */
+  press(clientX: number, clientY: number): boolean;
+  drag(clientX: number, clientY: number): void;
+  /** The press it took lets go; `tapped` when it didn't move. */
+  release(clientX: number, clientY: number, tapped: boolean): void;
+  /** The browser took the press over (an edge swipe, palm rejection): it lets go without doing anything. */
+  cancel(): void;
+  /** Moves things on. How many times the child finished the close-up's one thing this frame. */
+  update(delta: number): number;
+  /** Where its things are on the canvas, in CSS pixels, as "x,y" (several joined by ";"), for the canvas's dataset. */
+  marks(): Readonly<Record<string, string>>;
+}
+
+const projected = new THREE.Vector3();
+
+/** Where `point` is on the canvas, in CSS pixels from its top left. */
+export function canvasPoint(canvas: HTMLCanvasElement, camera: THREE.Camera, point: THREE.Vector3): THREE.Vector2 {
+  const rect = canvas.getBoundingClientRect();
+  projected.copy(point).project(camera);
+  return new THREE.Vector2(((projected.x + 1) / 2) * rect.width, ((1 - projected.y) / 2) * rect.height);
+}
+
+/** How far a pointer at `clientX`, `clientY` is from `point` on screen, in CSS pixels. */
+export function screenGap(
+  canvas: HTMLCanvasElement,
+  camera: THREE.Camera,
+  point: THREE.Vector3,
+  clientX: number,
+  clientY: number,
+): number {
+  const rect = canvas.getBoundingClientRect();
+  const { x, y } = canvasPoint(canvas, camera, point);
+  return Math.hypot(clientX - rect.left - x, clientY - rect.top - y);
+}
+
+export function formatMark(point: THREE.Vector2): string {
+  return `${Math.round(point.x)},${Math.round(point.y)}`;
+}
+
+/** Every vertex of a model as it stands now, in the world, and how far along the way it faces (+z) each one is. */
+export function modelPoints(object: THREE.Object3D): { points: THREE.Vector3[]; reach: number[] } {
+  object.updateWorldMatrix(true, true);
+  const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(object.getWorldQuaternion(new THREE.Quaternion()));
+  const points: THREE.Vector3[] = [];
+  object.traverse((part) => {
+    if (part instanceof THREE.Mesh) {
+      const mesh = part as THREE.Mesh;
+      const count = mesh.geometry.getAttribute('position').count;
+      for (let i = 0; i < count; i++) {
+        points.push(mesh.getVertexPosition(i, new THREE.Vector3()).applyMatrix4(mesh.matrixWorld));
+      }
+    }
+  });
+  return { points, reach: points.map((point) => point.dot(forward)) };
+}
+
+/** A point on the plane facing the camera through `through`, under a pointer at `clientX`, `clientY`. */
+export function pointerAt(
+  canvas: HTMLCanvasElement,
+  camera: THREE.Camera,
+  through: THREE.Vector3,
+  clientX: number,
+  clientY: number,
+  target: THREE.Vector3,
+): THREE.Vector3 | null {
+  const rect = canvas.getBoundingClientRect();
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(
+    new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1),
+    camera,
+  );
+  const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), through);
+  return raycaster.ray.intersectPlane(plane, target);
+}

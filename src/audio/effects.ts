@@ -116,6 +116,28 @@ export function playMunch(mixer: Mixer): void {
   }
 }
 
+/** A splat of mud washed off in a close-up: a soft swoosh, then bubbles popping. */
+export function playScrub(mixer: Mixer): void {
+  const { context } = mixer;
+  const at = context.currentTime;
+  const length = Math.ceil(context.sampleRate * 0.25);
+  const noise = context.createBuffer(1, length, context.sampleRate);
+  const samples = noise.getChannelData(0);
+  for (let i = 0; i < length; i++) {
+    samples[i] = (Math.random() * 2 - 1) * Math.sin((Math.PI * i) / length);
+  }
+  const swoosh = context.createBufferSource();
+  swoosh.buffer = noise;
+  const tone = context.createBiquadFilter();
+  tone.type = 'bandpass';
+  tone.frequency.value = 1800;
+  const gain = context.createGain();
+  gain.gain.value = 0.25;
+  swoosh.connect(tone).connect(gain).connect(mixer.buses.effects);
+  swoosh.start(at);
+  [1400, 1760, 2100].forEach((frequency, i) => note(mixer, frequency, at + 0.2 + i * 0.07, 0.08, { volume: 0.1 }));
+}
+
 /** An eggshell crack, then a fanfare with a sparkle on top, for a hatch. */
 export function playHatch(mixer: Mixer): void {
   const { context } = mixer;
