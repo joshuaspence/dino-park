@@ -127,6 +127,8 @@ describe('Ranger Rosie', () => {
       'rosie.fact.trex.1',
     ]);
     expect(lines.get('rosie.about.trex')).toBe('This is Rex! Rex is a Tyrannosaurus rex.');
+    expect(lines.get('rosie.pat.trex')).toBe('Rex loves a tickle!');
+    expect(lines.get('rosie.pat.velociraptor')).toBe('The Raptors love a tickle!');
     expect(lines.get('rosie.about.velociraptor')).toBe('These are the Raptors! The Raptors are Velociraptors.');
     for (const species of [...LAUNCH_SPECIES, ...UNLOCK_ORDER]) {
       const resident = { ...rex, species, levels: { ...rex.levels, dirty: 0.55 } };

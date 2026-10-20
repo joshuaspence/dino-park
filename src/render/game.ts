@@ -1,13 +1,23 @@
 import * as THREE from 'three';
 
-import { playDeliver, playHatch, playHonk, playLoad, playNeed, startEngine } from '../audio/effects';
+import { playDeliver, playGiggle, playHatch, playHonk, playLoad, playNeed, startEngine } from '../audio/effects';
 import type { Mixer } from '../audio/mixer';
 import { startMusic } from '../audio/music';
 import { AWAKE, type Bedtime, type BedtimeMinutes, stepBedtime, wake as wakeBedtime } from '../core/bedtime';
 import { createRosieVoice } from '../audio/rosie';
 import { loadVoices } from '../audio/voices';
 import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, pullOver, stepJeep } from '../core/jeep';
-import { NEEDS_PER_EGG, type Resident, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
+import {
+  NEEDS_PER_EGG,
+  type Resident,
+  eggProgress,
+  eggReady,
+  inTutorial,
+  isSad,
+  startCare,
+  stepNeeds,
+} from '../core/needs';
+import { PAT_SECONDS, PAT_TALK_SECONDS, patAt } from '../core/pat';
 import { type Subject, subjectAt, subjectKey, subjectPoint } from '../core/inspect';
 import { type Beat, type Focus, type LineId, rosieOnCard, rosieSays, welcomeLine } from '../core/rosie';
 import { resumeCare, savePark } from '../core/save';
@@ -137,6 +147,11 @@ const GATE_SWING = 2;
 /** How long a dinosaur looks at the jeep after a honk, and how quickly it turns (per second). */
 const LOOK_SECONDS = 3;
 const LOOK_TURN = 6;
+/** A pat's hearts: how many, how big, how fast they rise and how long they last. */
+const PAT_HEARTS = 3;
+const HEART_SIZE = 2;
+const HEART_RISE = 2.5;
+const HEART_SECONDS = 1.2;
 
 function hatchlingSpot(index: number): Point {
   const angle = ((index % HATCHLING_SPOTS) / (HATCHLING_SPOTS - 1) - 0.5) * 2 * HATCHLING_ARC;
@@ -273,6 +288,12 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     egg.add(spot);
   }
   scene.add(egg);
+
+  /** A pat's hearts rising from a dinosaur, removed once they fade. */
+  const hearts: { sprite: THREE.Sprite; age: number; drift: number }[] = [];
+  /** When each dinosaur was last patted, and when Rosie last said something about a pat, by `performance.now()`. */
+  const lastPats = new Map<SpeciesId, number>();
+  let lastPatTalk = -Infinity;
 
   /** Half-shells flying apart after a hatch, removed once they land. */
   const shells: { mesh: THREE.Mesh; velocity: THREE.Vector3; age: number }[] = [];
@@ -572,8 +593,13 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     if (!press.holding) {
       // A tap on the park closes any open card, and still drives; a second tap straight after opens one.
       closeCard();
-      const target = floatingTargetAt(event.clientX, event.clientY) ?? groundPointAt(event.clientX, event.clientY);
-      if (target) {
+      const floating = floatingTargetAt(event.clientX, event.clientY);
+      const target = floating ?? groundPointAt(event.clientX, event.clientY);
+      // A tap on the dinosaur in the pen the jeep is stopped at pats it, and the jeep stays where it is.
+      const patted = !floating && target ? patTarget(target) : null;
+      if (patted) {
+        pat(patted);
+      } else if (target) {
         driveTowards(snapToDestination(target));
       }
       const now = performance.now();
@@ -588,6 +614,58 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       }
     }
     press = null;
+  }
+
+  function patTarget(point: Point): SpeciesId | null {
+    if (bedtime.asleep || !loaded || !settingsKnown) {
+      return null;
+    }
+    return patAt(PARK, point, { position: jeep.position, parked: jeep.route.length === 0 }, care.eggsHatched);
+  }
+
+  /** The dinosaurs of `species` giggle and hop, with hearts, and now and then Rosie says how much they love it. */
+  function pat(species: SpeciesId): void {
+    const now = performance.now();
+    if (now - (lastPats.get(species) ?? -Infinity) < PAT_SECONDS * 1000) {
+      return;
+    }
+    lastPats.set(species, now);
+    canvas.dataset.patted = species;
+    playGiggle(mixer);
+    voices.play(species, 'helped');
+    for (const dino of herds.get(species) ?? []) {
+      dino.play('jump');
+      const top = new THREE.Box3().setFromObject(dino.object).max.y;
+      for (let i = 0; i < PAT_HEARTS; i++) {
+        const sprite = new THREE.Sprite(iconMaterial('heart', { bare: true }).clone());
+        sprite.scale.setScalar(HEART_SIZE);
+        sprite.position.set(dino.object.position.x + (i - 1) * 1.2, top + i * 0.6, dino.object.position.z);
+        scene.add(sprite);
+        hearts.push({ sprite, age: -i * 0.15, drift: (i - 1) * 0.6 });
+      }
+    }
+    // Not during the tour, whose every line matters, nor over anything else she's saying.
+    if (!inTutorial(care) && !inspecting && !rosieVoice.speaking && now - lastPatTalk >= PAT_TALK_SECONDS * 1000) {
+      lastPatTalk = now;
+      say(`rosie.pat.${species}`);
+    }
+  }
+
+  function updateHearts(delta: number): void {
+    for (const heart of hearts) {
+      heart.age += delta;
+      if (heart.age > 0) {
+        heart.sprite.position.y += HEART_RISE * delta;
+        heart.sprite.position.x += heart.drift * delta;
+      }
+      heart.sprite.visible = heart.age > 0;
+      heart.sprite.material.opacity = 1 - Math.max(0, heart.age) / HEART_SECONDS;
+    }
+    for (const heart of hearts.filter((candidate) => candidate.age > HEART_SECONDS)) {
+      scene.remove(heart.sprite);
+      heart.sprite.material.dispose();
+      hearts.splice(hearts.indexOf(heart), 1);
+    }
   }
 
   /** A press the browser took over (an edge swipe, palm rejection) goes nowhere. */
@@ -881,6 +959,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     canvas.dataset.speaking = String(rosieVoice.speaking);
     updateBedtime(delta);
     updateLooking(delta);
+    updateHearts(delta);
 
     sun.position.set(jeep.position.x + 15, 30, jeep.position.z + 10);
     sun.target.position.set(jeep.position.x, 0, jeep.position.z);

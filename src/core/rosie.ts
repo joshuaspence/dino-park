@@ -117,6 +117,8 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
       lines.set(`rosie.need.${species}.${kind}`, `${NEED_PHRASES[kind](name, verb)} Let's get ${supply}!`);
     }
     lines.set(`rosie.hatch.${species}`, `Look, it's ${SPECIES[species].residentName}! Welcome to the park!`);
+    // A pat (docs/design.md §3), now and then.
+    lines.set(`rosie.pat.${species}`, `${name} ${verb === 'are' ? 'love' : 'loves'} a tickle!`);
   }
   for (const [kind, supply] of Object.entries(SUPPLIES)) {
     lines.set(`rosie.load.${kind}`, `Got ${supply}!`);
