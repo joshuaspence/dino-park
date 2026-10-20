@@ -736,7 +736,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       return false;
     }
     closeCard();
-    // The mouth is measured once, so a dinosaur turned to look at a honk faces the way it did first.
+    // A close-up measures its dinosaur as it opens, so one turned to look at a honk faces the way it did first.
     if (looking) {
       looking.dino.object.rotation.y = looking.facing;
       looking = null;
@@ -1177,7 +1177,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       return;
     }
     playHonk(mixer);
-    // In a close-up the dinosaur stays facing the food, whose mouth was measured as the close-up opened.
+    // In a close-up the dinosaur stays as it was measured when the close-up opened.
     if (closeUp) {
       return;
     }
