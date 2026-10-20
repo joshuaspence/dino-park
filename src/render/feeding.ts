@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+import { penGate } from '../core/park';
+
 import { type CloseUpView, canvasPoint, formatMark, modelPoints, pointerAt, screenGap } from './closeUpView';
 import { cargoIcon, iconMaterial } from './icons';
 
@@ -50,7 +52,10 @@ export function createFeeding(scene: THREE.Scene, camera: THREE.Camera, canvas: 
   }
 
   return {
-    start(herd, item, gate) {
+    start(herd, item, pen) {
+      // The food waits between the dinosaur and the jeep, at the gate, at the height of a child's hand.
+      const { x, z } = penGate(pen);
+      const gate = new THREE.Vector3(x, 3, z);
       const first = herd[0];
       if (!first) {
         return;

@@ -100,6 +100,11 @@ score.**
     child rubs each one off with a sponge that follows their finger, in a froth of bubbles (two
     taps on a splat do it too). All clean, and Rosie says so ("Sparkly clean! Steggy loves a
     bath!").
+  - **Fetch**, after a toy. The camera pulls back to show the whole pen, and the ball waits just
+    inside the gate. The child taps anywhere in the pen to throw it there (never over the fence);
+    the dinosaur runs after it, carries it back on its back and giggles. Three fetches and Rosie
+    says it loves playing fetch ("Good catch! Rex loves playing fetch!"). The dinosaur stays where
+    it dropped the ball rather than jumping back to where it stood.
 
 ## 4. Driving, controls and camera
 
@@ -359,5 +364,5 @@ Each milestone is a stack of small PRs (under ~1,500 changed lines each).
 - **M2: More park.** Pterodactyl aviary and fish pond; Ankylosaurus and further unlocks; baby
   dinosaurs; the bedtime timer; automatic quality steps verified on real budget tablets.
 - **M3: Polish and family.** Sibling profiles; day/night and weather; jeep colour choice;
-  close-ups (feeding by hand and washing are in).
+  close-ups (feeding by hand, washing and fetch are in).
 - **Later:** recorded voices replacing TTS, translations, a Capacitor App Store wrapper.
