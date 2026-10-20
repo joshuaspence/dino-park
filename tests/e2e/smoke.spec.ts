@@ -150,6 +150,21 @@ test('loads the toy shed when the jeep stops there', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-cargo', 'toys');
 });
 
+test('drives to a station when its floating sign is tapped', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // The toy shed's ball floats well above it: the ground under the ball is too far from the shed to count as it.
+  await canvas.click({ position: { x: box.width * 0.33, y: box.height * 0.255 } });
+  await playFor(page, 6000, async () => (await canvas.getAttribute('data-cargo')) === 'toys');
+  await expect(canvas).toHaveAttribute('data-cargo', 'toys');
+});
+
 test('saves a hatched egg and remembers it after a reload', async ({ page }) => {
   test.slow();
   await page.clock.install();
@@ -712,6 +727,8 @@ test('Rosie walks a new player through their first delivery, showing them each p
     await expect(canvas).toHaveAttribute('data-speaking', 'false', { timeout: 30_000 });
     await playFor(page, 4000, async () => (await canvas.getAttribute('data-spotlight')) === 'false');
     await expect(canvas).toHaveAttribute('data-spotlight', 'false');
+    // The camera eases back to the jeep over a second or so.
+    await playFor(page, 2000);
   };
 
   // The first tap lets sound start. Rosie says hello and asks for a drive, with an arrow up the middle road; nobody
@@ -733,8 +750,8 @@ test('Rosie walks a new player through their first delivery, showing them each p
   await expect(canvas).toHaveAttribute('data-spotlight', 'true');
   await listen();
 
-  // The arrow is over the toy shed, down and to the left of the jeep now.
-  await tap(0.26, 0.58);
+  // The arrow is over the toy shed's sign, down and to the left of the jeep now.
+  await tap(0.27, 0.41);
   await playFor(page, 6000, async () => (await canvas.getAttribute('data-cargo')) === 'toys');
   await expect(canvas).toHaveAttribute('data-cargo', 'toys');
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.load');

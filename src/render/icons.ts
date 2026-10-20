@@ -39,6 +39,21 @@ export function cargoIcon(kind: StationKind): Icon {
   return CARGO_ICONS[kind];
 }
 
+/** The bubble each station's load answers: its sign in the park, so a child can match a bubble to a station by eye. */
+const STATION_ICONS: Readonly<Record<StationKind, Icon>> = {
+  hay: 'leaf',
+  meat: 'meat',
+  fish: 'fish',
+  water: 'drop',
+  bath: 'mud',
+  toys: 'ball',
+  vet: 'bandage',
+};
+
+export function stationIcon(kind: StationKind): Icon {
+  return STATION_ICONS[kind];
+}
+
 const SIZE = 128;
 const CENTRE = 60;
 

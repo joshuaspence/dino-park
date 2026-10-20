@@ -52,6 +52,11 @@ score.**
   | Bored                | ball       | toy shed                |
   | Poorly               | bandage    | vet tent                |
 
+- **Each station has a sign**: the picture of the bubble it answers floats above it (a leaf over
+  the haystack, a drop over the water tower, mud over the bath), so a child can match a bubble to
+  its station by eye. Signs hold still, where bubbles bob, so they read as signs rather than
+  requests. A tap on a sign drives to its station, and a double tap opens its card; when the arrow
+  points at a station it rises above the sign.
 - Driving to a station **loads the item automatically** and it shows on the back of the jeep.
   Driving back to the pen **delivers it automatically**, and the dinosaur plays a joyful animation
   and sound (munching, splashing, a happy roar, a dance).

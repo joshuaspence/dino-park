@@ -140,6 +140,17 @@ function buildNest(): THREE.Group {
   return group;
 }
 
+/** How tall each station's model is, so its sign can float just above it. */
+export const STATION_TOPS: Readonly<Record<StationKind, number>> = {
+  hay: 2,
+  meat: 3.4,
+  fish: 0.5,
+  water: 4.9,
+  bath: 0.8,
+  toys: 3.6,
+  vet: 2.6,
+};
+
 /** Simple, chunky stand-ins for each station, recognisable by shape and colour. */
 function buildStation(kind: StationKind): THREE.Group {
   const group = new THREE.Group();

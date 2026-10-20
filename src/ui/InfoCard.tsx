@@ -3,26 +3,14 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { ROSIE_FACTS, SPECIES_FACTS, type SpeciesFacts } from '../core/facts';
 import type { Subject } from '../core/inspect';
 import { type Mood, NEED_KINDS, NEEDS_PER_EGG, type NeedKind, type Resident, moodOf } from '../core/needs';
-import type { StationKind } from '../core/park';
 import { SPECIES, type SpeciesId } from '../core/species';
 import type { GameHandle } from '../render/game';
-import { type Icon, cargoIcon, iconImage, needIcon } from '../render/icons';
+import { type Icon, cargoIcon, iconImage, needIcon, stationIcon } from '../render/icons';
 import { RosieFace } from './RosieFace';
 import { strings } from './strings';
 
 /** How often a card catches up with the park: meters drain slowly, and the egg grows a step at a time. */
 const REFRESH_MS = 500;
-
-/** The bubble each station's load answers, so a child can match the station to what it's for. */
-const ANSWERS: Readonly<Record<StationKind, Icon>> = {
-  hay: 'leaf',
-  meat: 'meat',
-  fish: 'fish',
-  water: 'drop',
-  bath: 'mud',
-  toys: 'ball',
-  vet: 'bandage',
-};
 
 /**
  * An info card (docs/design.md §6), opened by a double tap on a dinosaur, a station, the egg nest or Rosie in the
@@ -45,7 +33,7 @@ export function InfoCard({ game, subject, onClose }: { game: GameHandle; subject
         </header>
         {/* The bubble it's for, and the happy dinosaur it makes. */}
         <p className="card-answers">
-          <img src={iconImage(ANSWERS[subject.station])} alt="" />
+          <img src={iconImage(stationIcon(subject.station))} alt="" />
           <span aria-hidden="true">→</span>
           <MoodFace mood="happy" />
         </p>
