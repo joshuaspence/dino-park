@@ -78,8 +78,11 @@ export function createFetching(scene: THREE.Scene, camera: THREE.Camera, canvas:
     },
     stop() {
       ball.visible = false;
-      // It stays where it dropped the ball, in its pen, rather than jumping back to where it stood.
-      fetcher?.play('idle');
+      // It stays where it dropped the ball, in its pen, rather than jumping back to where it stood. Stopped, it's
+      // jumping for the last fetch, which settles back to idle by itself.
+      if (running) {
+        fetcher?.play('idle');
+      }
       fetch = null;
       fetcher = null;
     },
@@ -111,10 +114,12 @@ export function createFetching(scene: THREE.Scene, camera: THREE.Camera, canvas:
         const turn = Math.atan2(Math.sin(heading - object.rotation.y), Math.cos(heading - object.rotation.y));
         object.rotation.y += turn * Math.min(1, TURN_RATE * delta);
       }
-      if (moving !== running) {
-        running = moving;
-        fetcher.play(moving ? 'run' : 'idle');
+      if (moving && !running) {
+        fetcher.play('run');
       }
+      // It only stops on bringing the ball back, when the close-up has it jump, and the jump settles back to idle by
+      // itself.
+      running = moving && !step.fetched;
       placeBall();
       return step.fetched ? 1 : 0;
     },
