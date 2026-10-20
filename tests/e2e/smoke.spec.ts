@@ -771,7 +771,10 @@ test('Rosie walks a new player through their first delivery, showing them each p
   ]);
 });
 
-/** Opens a park past the guided tour, and returns the canvas and a position on it as fractions of its size. */
+/**
+ * Opens a park past the guided tour, with the clock paused, and returns the canvas and a position on it as fractions of
+ * its size.
+ */
 async function openPlayedPark(page: Page) {
   await page.clock.install();
   await page.goto('./');
@@ -779,6 +782,9 @@ async function openPlayedPark(page: Page) {
   await page.reload();
   const canvas = page.locator('canvas.world');
   await expect(canvas).toHaveAttribute('data-ready', 'true');
+  // An installed clock still runs in real time, and CI's software WebKit can take seconds over a dblclick, leaving its
+  // two clicks further apart than a double tap. Paused, game time moves only when the test plays it.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000);
   const box = await canvas.boundingBox();
   if (!box) {
     throw new Error('Canvas has no size');
@@ -803,6 +809,8 @@ async function doubleTap(page: Page, canvas: Locator, position: { x: number; y: 
   await expect(canvas).toHaveAttribute('data-moving', 'false');
   await expect(canvas).toHaveAttribute('data-spotlight', 'false');
   await canvas.dblclick({ position });
+  // The canvas's attributes catch up on the next frame.
+  await playFor(page, 200);
 }
 
 test('a double tap on a dinosaur opens its card, which Rosie reads aloud', async ({ page }) => {
