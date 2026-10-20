@@ -7,8 +7,9 @@ import { AWAKE, type Bedtime, type BedtimeMinutes, stepBedtime, wake as wakeBedt
 import { createRosieVoice } from '../audio/rosie';
 import { loadVoices } from '../audio/voices';
 import { CRUISE_SPEED, type Jeep, angleBetween, driveAlong, parkedJeep, pullOver, stepJeep } from '../core/jeep';
-import { NEEDS_PER_EGG, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
-import { type Beat, type Focus, type LineId, rosieSays, welcomeLine } from '../core/rosie';
+import { NEEDS_PER_EGG, type Resident, eggProgress, eggReady, isSad, startCare, stepNeeds } from '../core/needs';
+import { type Subject, subjectAt, subjectKey, subjectPoint } from '../core/inspect';
+import { type Beat, type Focus, type LineId, rosieOnCard, rosieSays, welcomeLine } from '../core/rosie';
 import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
@@ -37,6 +38,14 @@ export interface GameHandle {
    * arrow points the way until it's done.
    */
   help(): void;
+  /** A dinosaur as it is now, for its info card. */
+  resident(species: SpeciesId): Resident | undefined;
+  /** How the egg in the nest is coming along, for its info card: needs met towards it, and whether it's ready. */
+  egg(): { progress: number; ready: boolean };
+  /** Rosie tells the next fact on the open card, for its "another fact". Returns which fact it was. */
+  nextFact(): number;
+  /** The card was closed: the camera goes back to the jeep. */
+  closeCard(): void;
   dispose(): void;
 }
 
@@ -45,6 +54,8 @@ export interface GameHooks {
   onAsleep(): void;
   /** Whether the child seems stuck, so the help button can wiggle to show it's there. */
   onStuck(stuck: boolean): void;
+  /** A double tap opened an info card about `subject`, or a tap on the park closed it (null). */
+  onInspect(subject: Subject | null): void;
 }
 
 /** Day and dusk, which the park fades between as it goes to sleep and wakes (docs/design.md §7). */
@@ -102,6 +113,12 @@ const ARROW_HEIGHT = 4.5;
 const ARROW_TAP_PX = 48;
 /** How long without loading, delivering or hatching, while there's something to do, before the child seems stuck. */
 const STUCK_SECONDS = 20;
+/** Two taps this close together, in time and on screen, are a double tap: it opens an info card. */
+const DOUBLE_TAP_MS = 400;
+const DOUBLE_TAP_PX = 40;
+/** A double tap this close on screen, in CSS pixels, to the middle of the jeep, this high, is on Rosie. */
+const JEEP_TAP_PX = 70;
+const JEEP_TAP_HEIGHT = 1.5;
 /** Hatchlings stand in an arc on the nest's far side from the cross road, wrapping round once it's full. */
 const HATCHLING_SPOTS = 7;
 const HATCHLING_RING = 4.5;
@@ -464,6 +481,45 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   }
 
   let press: { id: number; x: number; y: number; at: number; holding: boolean } | null = null;
+  /** The last tap, to tell a double tap. */
+  let lastTap: { x: number; y: number; at: number } | null = null;
+  /** The dinosaur whose card is open, which the camera keeps in view, and the fact Rosie told last. */
+  let inspecting: { subject: Subject; fact: number } | null = null;
+
+  function closeCard(): void {
+    if (inspecting) {
+      inspecting = null;
+      spotlight = null;
+      hooks.onInspect(null);
+    }
+  }
+
+  /**
+   * A double tap at `clientX`, `clientY`, over `point` on the ground, opens the card of whatever is there. The jeep
+   * stands well above the ground, so a tap on it is told by where it is on screen.
+   */
+  function inspect(point: Point, clientX: number, clientY: number): void {
+    const rect = canvas.getBoundingClientRect();
+    onScreen.copy(jeepModel.position).setY(JEEP_TAP_HEIGHT).project(camera);
+    const onJeep =
+      Math.hypot(
+        clientX - (rect.left + ((onScreen.x + 1) / 2) * rect.width),
+        clientY - (rect.top + ((1 - onScreen.y) / 2) * rect.height),
+      ) <= JEEP_TAP_PX;
+    const subject = bedtime.asleep
+      ? null
+      : onJeep
+        ? { rosie: true as const }
+        : subjectAt(PARK, point, care.eggsHatched, jeep.position);
+    if (!subject) {
+      return;
+    }
+    // The double tap's first tap set off for wherever it was: asking about something isn't going there.
+    jeep = pullOver(jeep);
+    inspecting = { subject, fact: 0 };
+    say(...rosieOnCard(subject, care, 0));
+    hooks.onInspect(subject);
+  }
   let sinceReplan = 0;
 
   function onPointerDown(event: PointerEvent): void {
@@ -496,9 +552,21 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       return;
     }
     if (!press.holding) {
-      const target = arrowTargetAt(event.clientX, event.clientY) ?? groundPointAt(event.clientX, event.clientY);
+      // A tap on the park closes any open card, and still drives; a second tap straight after opens one.
+      closeCard();
+      const ground = groundPointAt(event.clientX, event.clientY);
+      const target = arrowTargetAt(event.clientX, event.clientY) ?? ground;
       if (target) {
         driveTowards(snapToDestination(target));
+      }
+      const now = performance.now();
+      const double =
+        lastTap !== null &&
+        now - lastTap.at <= DOUBLE_TAP_MS &&
+        Math.hypot(event.clientX - lastTap.x, event.clientY - lastTap.y) <= DOUBLE_TAP_PX;
+      lastTap = double ? null : { x: event.clientX, y: event.clientY, at: now };
+      if (double && ground) {
+        inspect(ground, event.clientX, event.clientY);
       }
     }
     press = null;
@@ -538,6 +606,11 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
    * compass direction, so a spot the child is about to tap never slides away under their finger.
    */
   function placeCamera(blend: number, delta: number): void {
+    // An open card keeps its dinosaur in view.
+    const shown = inspecting && subjectPoint(PARK, inspecting.subject, jeep.position);
+    if (shown) {
+      spotlight = { point: shown, left: Math.max(spotlight?.left ?? 0, SPOTLIGHT_SECONDS) };
+    }
     if (spotlight) {
       spotlight.left -= delta;
       if (spotlight.left <= 0) {
@@ -629,6 +702,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       }
       arrow.visible = false;
       canvas.dataset.pointer = '';
+      closeCard();
       if (stuck) {
         stuck = false;
         hooks.onStuck(false);
@@ -650,9 +724,12 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       if (event.type === 'deliver' || event.type === 'hatch') {
         helping = false;
       }
-      // Asked for help, she sticks to the job in hand: another dinosaur's bubble and call are enough to say it wants
-      // something, and a load is followed by where to take it, or where to fetch the right thing instead.
-      if (!(helping && event.type === 'need')) {
+      // Asked for help, she sticks to that: another dinosaur's bubble and call are enough to say it wants something,
+      // and a load is followed by where to take it, or where to fetch the right thing. Reading a card, she finishes it:
+      // a bubble or a load's chime says enough.
+      const quiet =
+        (helping && event.type === 'need') || (inspecting && (event.type === 'need' || event.type === 'load'));
+      if (!quiet) {
         const helped = helping && event.type === 'load' && !tourStep(care, driven);
         say(...(helped ? nextHint(care, PARK, driven).beats : rosieSays(event, care)));
       }
@@ -730,6 +807,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       hooks.onStuck(stuck);
     }
     canvas.dataset.stuck = String(stuck);
+    canvas.dataset.inspecting = inspecting ? subjectKey(inspecting.subject) : '';
   }
 
   const timer = new THREE.Timer();
@@ -943,6 +1021,22 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       sinceProgress = 0;
       say(...hint.beats);
     },
+    resident(species) {
+      return care.residents.find((resident) => resident.species === species);
+    },
+    egg() {
+      return { progress: eggProgress(care), ready: eggReady(care) };
+    },
+    nextFact() {
+      if (!inspecting) {
+        return 0;
+      }
+      inspecting.fact += 1;
+      // Only the fact: who it is, she's already said.
+      say(...rosieOnCard(inspecting.subject, care, inspecting.fact).slice(-1));
+      return inspecting.fact;
+    },
+    closeCard,
     wake() {
       if (!bedtime.asleep) {
         return;

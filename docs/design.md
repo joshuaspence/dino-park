@@ -135,7 +135,8 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
 
 **No reading is ever required.**
 
-- Gameplay has **no text**: needs, stations and buttons are pictures. The little text that exists
+- Gameplay has **no text** a child needs: needs, stations and buttons are pictures. An info card's
+  small captions are for grown-ups, and Rosie reads the card aloud. The little text that exists
   (parent area, settings) lives in string files, in **Australian English**.
 - **Ranger Rosie** is the mascot: a cheerful **Parasaurolophus** in a ranger hat who rides in the
   passenger seat. Her crest makes her silhouette unmistakable, and she honks through it. She speaks
@@ -179,6 +180,25 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   something. With nothing to do she says everyone's happy. During the tour, help repeats the
   current step. **Her picture wiggles when the child seems stuck**: 20 seconds without driving
   (in the tour), loading, delivering or hatching while there's something to do.
+- **Double-tap a dinosaur for its info card.** A single tap still drives, so tapping a dinosaur to
+  deliver to it is never interrupted. The card sits on the right with the camera holding the
+  dinosaur in view on the left, and **Rosie reads it aloud**: "This is Rex! Rex is a
+  Tyrannosaurus rex.", how Rex feels (what he wants, if anything), then a fact about the real
+  species. Everything a child needs is a picture: a mood face (happy, fine, wants something, sad)
+  and the five need meters, each with the picture of what fills it (Rex's food is meat, Trixie's
+  hay) and green, amber or red. The name, species, meter names and the fact's text are small
+  captions for grown-ups and readers; nothing needs reading. A speech-bubble button tells the next
+  fact, three per species, written for 3–6 year olds and true to current palaeontology (the
+  Pterodactyl's says it wasn't really a dinosaur). While the card is open Rosie doesn't announce
+  other needs or loads, so she finishes reading it; their bubbles, calls and chimes still play. A
+  tap on the park, or the close button, closes it.
+- **Stations, the egg nest and Rosie have cards too.** A station's card shows the bubble it's for
+  and a happy face, and Rosie says what it's for ("This is the toy shed. Bored dinosaurs love a toy
+  to play with!"). The nest's shows one egg step for each dinosaur helped towards the next egg,
+  and who's inside stays a surprise. Rosie's own card, from a double tap on the jeep, introduces
+  her as a Parasaurolophus, with facts like any dinosaur's. A double tap's first tap sets off to
+  drive like any tap, so the jeep pulls over when the card opens: asking about a place isn't
+  going there.
 - **Each dinosaur has its own voice** (roar, chirp, honk) for wanting something, being helped and
   sleeping, so children can hear who needs help.
 - **Gentle looping background music**, plus sound effects. Most effects (honk, engine, chimes,

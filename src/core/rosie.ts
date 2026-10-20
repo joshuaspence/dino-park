@@ -4,10 +4,14 @@ import {
   NEED_KINDS,
   type NeedKind,
   TUTORIAL_NEED,
+  type Resident,
   eggReady,
+  moodOf,
   supplyFor,
   tutorialStep,
 } from './needs';
+import { ROSIE_FACTS, SPECIES_FACTS } from './facts';
+import type { Subject } from './inspect';
 import type { StationKind } from './park';
 import { LAUNCH_SPECIES, SPECIES, type SpeciesId, UNLOCK_ORDER } from './species';
 
@@ -59,6 +63,17 @@ const STATION_NAMES: Readonly<Record<StationKind, string>> = {
 
 const CHEERS = ['Hooray!', 'Yay, well done!', 'They love it!'];
 
+/** What Rosie says about each station on its info card. */
+const STATION_ABOUT: Readonly<Record<StationKind, string>> = {
+  hay: 'This is the haystack. Plant-eating dinosaurs love to munch hay!',
+  meat: 'This is the butcher. Meat-eating dinosaurs come here for their dinner!',
+  fish: 'This is the fish pond. Pterodactyls love fresh fish!',
+  water: 'This is the water tower. Thirsty dinosaurs need a drink!',
+  bath: 'This is the bath. Muddy dinosaurs get a bubble bath here!',
+  toys: 'This is the toy shed. Bored dinosaurs love a toy to play with!',
+  vet: 'This is the vet tent. The vet helps dinosaurs who feel poorly!',
+};
+
 /** The species Rosie can talk about: everyone who lives in the park now or will hatch into it. */
 const SPECIES_SPOKEN_OF: readonly SpeciesId[] = [...LAUNCH_SPECIES, ...UNLOCK_ORDER];
 
@@ -107,6 +122,25 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
     lines.set(`rosie.load.${kind}`, `Got ${supply}!`);
   }
   CHEERS.forEach((cheer, i) => lines.set(`rosie.cheer.${i}`, cheer));
+  // A dinosaur's info card (docs/design.md §6): who it is, how it feels, and what the real species was like.
+  for (const species of SPECIES_SPOKEN_OF) {
+    const { name, verb } = subject(species);
+    const about = SPECIES_FACTS[species];
+    const these = SPECIES[species].herdSize > 1 ? 'These are' : 'This is';
+    lines.set(`rosie.about.${species}`, `${these} ${SPECIES[species].residentName}! ${name} ${verb} ${about.spoken}.`);
+    lines.set(`rosie.mood.${species}.happy`, `${name} ${verb} happy!`);
+    lines.set(`rosie.mood.${species}.fine`, `${name} ${verb} doing fine.`);
+    about.facts.forEach((fact, i) => lines.set(`rosie.fact.${species}.${i}`, fact));
+  }
+  for (const [kind, line] of Object.entries(STATION_ABOUT)) {
+    lines.set(`rosie.about.station.${kind}`, line);
+  }
+  lines.set(
+    'rosie.about.nest',
+    "This is the nest. Every dinosaur you help makes the egg grow. Who's inside? It's a surprise!",
+  );
+  lines.set('rosie.about.rosie', `That's me, Ranger Rosie! I'm ${ROSIE_FACTS.spoken}.`);
+  ROSIE_FACTS.facts.forEach((fact, i) => lines.set(`rosie.fact.rosie.${i}`, fact));
   // Help, when the child taps her picture (docs/design.md §6).
   lines.set('rosie.help.offer', "If you're ever stuck, tap my picture, and I'll show you what to do!");
   lines.set('rosie.help.wait', "Everyone's happy right now! Let's drive around, and look for a bubble.");
@@ -121,6 +155,44 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
     lines.set(`rosie.help.fetch.${kind}`, `Tap the ${station}!`);
   }
   return lines;
+}
+
+/**
+ * What Rosie says when a dinosaur's card opens: who it is, how it feels (what it wants, if anything), and fact number
+ * `fact` about its species, counting round.
+ */
+export function rosieAbout(resident: Resident, fact: number): readonly Beat[] {
+  const { species, need } = resident;
+  const mood = moodOf(resident);
+  const facts = SPECIES_FACTS[species].facts;
+  return [
+    { line: `rosie.about.${species}` },
+    {
+      line: need
+        ? `rosie.need.${species}.${need.kind}`
+        : `rosie.mood.${species}.${mood === 'happy' ? 'happy' : 'fine'}`,
+    },
+    { line: `rosie.fact.${species}.${((fact % facts.length) + facts.length) % facts.length}` },
+  ];
+}
+
+/**
+ * What Rosie says when a card about `subject` opens, given the park: a dinosaur's as above, a station's purpose, the
+ * egg's progress, or her own introduction and fact number `fact`.
+ */
+export function rosieOnCard(subject: Subject, care: Care, fact: number): readonly Beat[] {
+  if ('dinosaur' in subject) {
+    const resident = care.residents.find((candidate) => candidate.species === subject.dinosaur);
+    return resident ? rosieAbout(resident, fact) : [];
+  }
+  if ('station' in subject) {
+    return [{ line: `rosie.about.station.${subject.station}` }];
+  }
+  if ('nest' in subject) {
+    return [{ line: eggReady(care) ? 'rosie.egg.ready' : 'rosie.about.nest' }];
+  }
+  const facts = ROSIE_FACTS.facts.length;
+  return [{ line: 'rosie.about.rosie' }, { line: `rosie.fact.rosie.${((fact % facts) + facts) % facts}` }];
 }
 
 /** What Rosie says when the game starts: a hello for a new park, a welcome back for one with progress. */

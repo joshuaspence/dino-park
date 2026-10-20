@@ -193,3 +193,27 @@ export function iconMaterial(icon: Icon, style: { bubble?: boolean; sad?: boolea
   }
   return material;
 }
+
+const images = new Map<Icon, string>();
+
+/** `icon` on a white disc as an image URL, for the info card to show the same pictures as the park. */
+export function iconImage(icon: Icon): string {
+  let image = images.get(icon);
+  if (!image) {
+    // Just the disc: the sprites' canvas leaves room below it for a bubble's tail.
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 2 * CENTRE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('No 2D canvas context');
+    }
+    ctx.beginPath();
+    ctx.arc(CENTRE, CENTRE, 50, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    draw(ctx, icon);
+    image = canvas.toDataURL();
+    images.set(icon, image);
+  }
+  return image;
+}
