@@ -96,7 +96,7 @@ score.**
     jeep and the dinosaur; the child drags it to its mouth (or just taps it, for children who
     can't drag yet) and it munches and hops. Three bites and Rosie says it loves it ("Yum! Bruno
     loves it!").
-  - **Washing**, after the bubble bath. Five splats of mud sit along the dinosaur's back; the
+  - **Washing**, after the bubble bath. Five splats of mud sit along the dinosaur's side; the
     child rubs each one off with a sponge that follows their finger, in a froth of bubbles (two
     taps on a splat do it too). All clean, and Rosie says so ("Sparkly clean! Steggy loves a
     bath!").
