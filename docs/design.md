@@ -90,7 +90,8 @@ score.**
   little game with it. The delivery has already met the need, so a close-up is all reward: it
   can't be got wrong, it ends by itself after 15 seconds left alone, and a red cross takes the
   child (or a grown-up) straight back to the park. In a close-up the park is out of reach: taps
-  don't drive, needs and loads don't interrupt Rosie, and the tour's own delivery never opens one.
+  don't drive, a honk turns no one, needs and loads don't interrupt Rosie, and the tour's own
+  delivery never opens one.
   - **Feeding by hand**, after food or a drink. The hay, meat, fish or water waits between the
     jeep and the dinosaur; the child drags it to its mouth (or just taps it, for children who
     can't drag yet) and it munches and hops. Three bites and Rosie says it loves it ("Yum! Bruno

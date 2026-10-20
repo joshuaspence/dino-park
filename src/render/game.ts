@@ -727,6 +727,11 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       return false;
     }
     closeCard();
+    // The mouth is measured once, so a dinosaur turned to look at a honk faces the way it did first.
+    if (looking) {
+      looking.dino.object.rotation.y = looking.facing;
+      looking = null;
+    }
     press = null;
     jeep = pullOver(jeep);
     const gate = penGate(pen);
@@ -1154,6 +1159,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       return;
     }
     playHonk(mixer);
+    // In a close-up the dinosaur stays facing the food, whose mouth was measured as the close-up opened.
+    if (closeUp) {
+      return;
+    }
     // Rosie rides in the jeep, so only dinosaurs standing in the park itself can turn to look, and not hatchlings
     // about to run to their pen, whose run sets their heading.
     const walking = new Set(walks.flatMap((walk) => walk.herd));
