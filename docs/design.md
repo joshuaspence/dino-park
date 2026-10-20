@@ -86,7 +86,16 @@ score.**
   at most every 20 seconds and never during the tour or over another line, Rosie says how much it
   loves a tickle ("Rex loves a tickle!"). A pat is just for fun: it meets no need and fills no
   meter, and the jeep stays where it is.
-- Out of scope for M1: hand-feeding or brushing mini-games (see M3).
+- **Close-ups.** Some deliveries open a close-up: the camera moves in on the dinosaur for a
+  little game with it. The delivery has already met the need, so a close-up is all reward: it
+  can't be got wrong, it ends by itself after 15 seconds left alone, and a red cross takes the
+  child (or a grown-up) straight back to the park. In a close-up the park is out of reach: taps
+  don't drive, a honk turns no one, needs and loads don't interrupt Rosie, and the tour's own
+  delivery never opens one.
+  - **Feeding by hand**, after food or a drink. The hay, meat, fish or water waits between the
+    jeep and the dinosaur; the child drags it to its mouth (or just taps it, for children who
+    can't drag yet) and it munches and hops. Three bites and Rosie says it loves it ("Yum! Bruno
+    loves it!").
 
 ## 4. Driving, controls and camera
 
@@ -346,5 +355,5 @@ Each milestone is a stack of small PRs (under ~1,500 changed lines each).
 - **M2: More park.** Pterodactyl aviary and fish pond; Ankylosaurus and further unlocks; baby
   dinosaurs; the bedtime timer; automatic quality steps verified on real budget tablets.
 - **M3: Polish and family.** Sibling profiles; day/night and weather; jeep colour choice;
-  close-up mini-games (brush or wash a dinosaur).
+  more close-ups (brush or wash a dinosaur) after feeding by hand.
 - **Later:** recorded voices replacing TTS, translations, a Capacitor App Store wrapper.

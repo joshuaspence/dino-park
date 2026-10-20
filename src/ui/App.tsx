@@ -26,6 +26,8 @@ export function App() {
   const [stuck, setStuck] = useState(false);
   /** What the open info card is about, if one is open. */
   const [card, setCard] = useState<{ subject: Subject; game: GameHandle } | null>(null);
+  /** Whether a close-up is on, so its way back to the park shows. */
+  const [closeUp, setCloseUp] = useState(false);
   /** The latest settings, which the game's callback and the parent area's changes build on. */
   const settingsRef = useRef(settings);
   useEffect(() => {
@@ -82,6 +84,7 @@ export function App() {
       onAsleep: () => changeSettings({ ...settingsRef.current, asleep: true }),
       onStuck: setStuck,
       onInspect: (subject) => setCard(subject && { subject, game }),
+      onCloseUp: (on) => setCloseUp(on !== null),
     });
     gameRef.current = game;
     mixerRef.current = mixer;
@@ -169,6 +172,19 @@ export function App() {
       >
         <RosieFace />
       </button>
+      {closeUp && (
+        // A close-up ends by itself, but a child who's had enough, or a grown-up, can go straight back to the park.
+        <button
+          type="button"
+          className="close-up-close"
+          aria-label={strings.backToPark}
+          onClick={() => gameRef.current?.endCloseUp()}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6 L18 18 M18 6 L6 18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
       {card && (
         <InfoCard
           key={subjectKey(card.subject)}

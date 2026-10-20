@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { type Care, type CareEvent, NEEDS_PER_EGG, NEED_KINDS, startCare } from './needs';
+import { type Care, type CareEvent, NEEDS_PER_EGG, NEED_KINDS, startCare, supplyFor } from './needs';
 import { PARK, type StationKind } from './park';
-import { rosieAbout, rosieLines, rosieOnCard, rosieSays, welcomeLine } from './rosie';
+import { rosieAbout, rosieLines, rosieOnCard, rosieOnCloseUp, rosieSays, welcomeLine } from './rosie';
 import { LAUNCH_SPECIES, type SpeciesId, UNLOCK_ORDER } from './species';
 
 const fresh = startCare(PARK);
@@ -129,6 +129,18 @@ describe('Ranger Rosie', () => {
     expect(lines.get('rosie.about.trex')).toBe('This is Rex! Rex is a Tyrannosaurus rex.');
     expect(lines.get('rosie.pat.trex')).toBe('Rex loves a tickle!');
     expect(lines.get('rosie.pat.velociraptor')).toBe('The Raptors love a tickle!');
+    expect(lines.get('rosie.feed.trex.meat')).toBe("Let's feed Rex! Drag the meat to Rex!");
+    expect(lines.get('rosie.feed.brontosaurus.water')).toBe("Let's give Bruno a drink! Drag the water to Bruno!");
+    expect(lines.get('rosie.fed.velociraptor')).toBe('Yum! The Raptors love it!');
+    const feeding = { kind: 'feed', species: 'trex', item: 'meat', done: 0, idle: 0 } as const;
+    expect(rosieOnCloseUp(feeding)).toBe('rosie.feed.trex.meat');
+    expect(rosieOnCloseUp({ ...feeding, done: 3 })).toBe('rosie.fed.trex');
+    // Every species has a line for every food it eats, and for water.
+    for (const species of [...LAUNCH_SPECIES, ...UNLOCK_ORDER]) {
+      for (const kind of ['hungry', 'thirsty'] as const) {
+        expect(lines.get(`rosie.feed.${species}.${supplyFor(kind, species)}`)).toBeTruthy();
+      }
+    }
     expect(lines.get('rosie.about.velociraptor')).toBe('These are the Raptors! The Raptors are Velociraptors.');
     for (const species of [...LAUNCH_SPECIES, ...UNLOCK_ORDER]) {
       const resident = { ...rex, species, levels: { ...rex.levels, dirty: 0.55 } };

@@ -1,6 +1,15 @@
 import * as THREE from 'three';
 
-import { playDeliver, playGiggle, playHatch, playHonk, playLoad, playNeed, startEngine } from '../audio/effects';
+import {
+  playDeliver,
+  playGiggle,
+  playHatch,
+  playHonk,
+  playLoad,
+  playMunch,
+  playNeed,
+  startEngine,
+} from '../audio/effects';
 import type { Mixer } from '../audio/mixer';
 import { startMusic } from '../audio/music';
 import { AWAKE, type Bedtime, type BedtimeMinutes, stepBedtime, wake as wakeBedtime } from '../core/bedtime';
@@ -18,8 +27,16 @@ import {
   stepNeeds,
 } from '../core/needs';
 import { PAT_SECONDS, PAT_TALK_SECONDS, patAt } from '../core/pat';
+import {
+  type CloseUp,
+  closeUpAfter,
+  closeUpFinished,
+  progressCloseUp,
+  stepCloseUp,
+  touchCloseUp,
+} from '../core/closeUp';
 import { type Subject, subjectAt, subjectKey, subjectPoint } from '../core/inspect';
-import { type Beat, type Focus, type LineId, rosieOnCard, rosieSays, welcomeLine } from '../core/rosie';
+import { type Beat, type Focus, type LineId, rosieOnCard, rosieOnCloseUp, rosieSays, welcomeLine } from '../core/rosie';
 import { resumeCare, savePark } from '../core/save';
 import { PARK, type Pen, openRoads, penGate } from '../core/park';
 import { type Point, distance, findRoute, nearestRoadPosition, pointAlong, routeLength } from '../core/roads';
@@ -28,6 +45,7 @@ import { nextHint } from '../core/help';
 import { holdUntilDriven, tourStep } from '../core/tour';
 import { type DinoInstance, type DinoSkin, loadDinoSkin } from './dinoSkin';
 import { buildRosie } from './rosieModel';
+import { createFeeding } from './feeding';
 import { cargoIcon, iconMaterial, needIcon, stationIcon } from './icons';
 import { buildJeep } from './jeepModel';
 import { loadPark, storePark } from '../storage/parkStore';
@@ -57,6 +75,8 @@ export interface GameHandle {
   nextFact(): number;
   /** The card was closed: the camera goes back to the jeep. */
   closeCard(): void;
+  /** Leaves the close-up early: the camera goes back to the jeep. */
+  endCloseUp(): void;
   dispose(): void;
 }
 
@@ -67,6 +87,8 @@ export interface GameHooks {
   onStuck(stuck: boolean): void;
   /** A double tap opened an info card about `subject`, or a tap on the park closed it (null). */
   onInspect(subject: Subject | null): void;
+  /** A close-up started (docs/design.md §3), or ended (null), so its way out can show. */
+  onCloseUp(closeUp: CloseUp | null): void;
 }
 
 /** Day and dusk, which the park fades between as it goes to sleep and wakes (docs/design.md §7). */
@@ -94,6 +116,9 @@ const CAMERA_PULL_BACK = 0.15;
 /** A delivery or hatch draws the camera in this close on the dinosaur or nest, for this long. */
 const SPOTLIGHT_ZOOM = 0.55;
 const SPOTLIGHT_SECONDS = 2.5;
+/** A close-up moves the camera in this close, and lingers on the dinosaur this long once it's finished. */
+const CLOSE_UP_ZOOM = 0.45;
+const CLOSE_UP_LINGER_SECONDS = 2;
 /** While Rosie talks about a place the camera shows it, and holds there this much longer once she's finished. */
 const FOCUS_LINGER_SECONDS = 0.5;
 /** How quickly the camera's distance eases between following and spotlighting (per second). */
@@ -288,6 +313,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     egg.add(spot);
   }
   scene.add(egg);
+
+  /** The close-up the camera is in, if any, and the food waiting in it. */
+  let closeUp: CloseUp | null = null;
+  const feeding = createFeeding(scene, camera, canvas);
 
   /** A pat's hearts rising from a dinosaur, removed once they fade. */
   const hearts: { sprite: THREE.Sprite; age: number; drift: number }[] = [];
@@ -519,7 +548,20 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     }
   }
 
-  let press: { id: number; x: number; y: number; at: number; holding: boolean } | null = null;
+  /**
+   * The finger or button down on the park: where it is now and where it went down. `feeding` when it picked up a
+   * close-up's food.
+   */
+  let press: {
+    id: number;
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    at: number;
+    holding: boolean;
+    feeding: boolean;
+  } | null = null;
   /** The last tap, to tell a double tap. */
   let lastTap: { x: number; y: number; at: number } | null = null;
   /** The dinosaur whose card is open, which the camera keeps in view, and the fact Rosie told last. */
@@ -569,7 +611,20 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     // release, so `onPointerUp` unlocks too.
     mixer.unlock();
     canvas.setPointerCapture(event.pointerId);
-    press = { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now(), holding: false };
+    if (closeUp) {
+      closeUp = touchCloseUp(closeUp);
+    }
+    const feeds = closeUp !== null && feeding.press(event.clientX, event.clientY);
+    press = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      startX: event.clientX,
+      startY: event.clientY,
+      at: performance.now(),
+      holding: false,
+      feeding: feeds,
+    };
     // Plan on the first hold frame, so a press released just after it stops being a tap still drives the jeep.
     sinceReplan = HOLD_REPLAN_SECONDS;
   }
@@ -578,16 +633,29 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     if (!press || event.pointerId !== press.id) {
       return;
     }
-    if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > TAP_SLOP_PX) {
+    // Measured from where it went down, so a slow drag, made of many small moves, still stops being a tap.
+    if (Math.hypot(event.clientX - press.startX, event.clientY - press.startY) > TAP_SLOP_PX) {
       press.holding = true;
     }
     press.x = event.clientX;
     press.y = event.clientY;
+    if (press.feeding) {
+      feeding.drag(event.clientX, event.clientY);
+    }
   }
 
   function onPointerUp(event: PointerEvent): void {
     mixer.unlock();
     if (!press || event.pointerId !== press.id) {
+      return;
+    }
+    // In a close-up, the park is out of reach: the only thing to do is the close-up's.
+    if (closeUp) {
+      if (press.feeding) {
+        // A close-up's press only counts as held once it moves, so a press that didn't move is a tap.
+        feeding.release(event.clientX, event.clientY, !press.holding);
+      }
+      press = null;
       return;
     }
     if (!press.holding) {
@@ -651,6 +719,71 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     }
   }
 
+  /** Starts `next`, if its dinosaurs are in the park to give things to. Whether it started. */
+  function startCloseUp(next: CloseUp): boolean {
+    const herd = herds.get(next.species);
+    const pen = PARK.pens.find((candidate) => candidate.species === next.species);
+    if (!herd?.length || !pen || bedtime.asleep) {
+      return false;
+    }
+    closeCard();
+    // The mouth is measured once, so a dinosaur turned to look at a honk faces the way it did first.
+    if (looking) {
+      looking.dino.object.rotation.y = looking.facing;
+      looking = null;
+    }
+    press = null;
+    jeep = pullOver(jeep);
+    const gate = penGate(pen);
+    feeding.start(herd, next.item, new THREE.Vector3(gate.x, 3, gate.z));
+    closeUp = next;
+    hooks.onCloseUp(next);
+    return true;
+  }
+
+  function endCloseUp(): void {
+    if (!closeUp) {
+      return;
+    }
+    feeding.stop();
+    closeUp = null;
+    press = null;
+    hooks.onCloseUp(null);
+  }
+
+  function updateCloseUp(delta: number): void {
+    if (closeUp && bedtime.asleep) {
+      endCloseUp();
+    }
+    if (closeUp && feeding.update(delta)) {
+      closeUp = progressCloseUp(closeUp);
+      sinceProgress = 0;
+      playMunch(mixer);
+      for (const dino of herds.get(closeUp.species) ?? []) {
+        dino.play('jump');
+      }
+      if (closeUpFinished(closeUp)) {
+        voices.play(closeUp.species, 'helped');
+        playDeliver(mixer);
+        say(rosieOnCloseUp(closeUp));
+        endCloseUp();
+      }
+    }
+    // Left alone, it ends by itself; a press, or food held, isn't left alone.
+    if (closeUp) {
+      const next = stepCloseUp(press?.feeding ? touchCloseUp(closeUp) : closeUp, delta);
+      if (!next) {
+        endCloseUp();
+      }
+      closeUp = next;
+    }
+    canvas.dataset.closeUp = closeUp?.kind ?? '';
+    canvas.dataset.bites = String(closeUp?.done ?? 0);
+    const { food, mouth } = feeding.onScreen();
+    canvas.dataset.food = closeUp ? `${Math.round(food.x)},${Math.round(food.y)}` : '';
+    canvas.dataset.mouth = closeUp ? `${Math.round(mouth.x)},${Math.round(mouth.y)}` : '';
+  }
+
   function updateHearts(delta: number): void {
     for (const heart of hearts) {
       heart.age += delta;
@@ -671,6 +804,9 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   /** A press the browser took over (an edge swipe, palm rejection) goes nowhere. */
   function onPointerCancel(event: PointerEvent): void {
     if (press && event.pointerId === press.id) {
+      if (press.feeding) {
+        feeding.cancel();
+      }
       press = null;
     }
   }
@@ -713,7 +849,16 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
         spotlight = null;
       }
     }
-    const targetZoom = spotlight ? SPOTLIGHT_ZOOM : 1 + (CAMERA_PULL_BACK * jeep.speed) / CRUISE_SPEED;
+    // A close-up holds the camera in on its dinosaur.
+    const closeTo = closeUp && PARK.pens.find((pen) => pen.species === closeUp?.species)?.position;
+    if (closeTo) {
+      spotlight = { point: closeTo, left: Math.max(spotlight?.left ?? 0, CLOSE_UP_LINGER_SECONDS) };
+    }
+    const targetZoom = closeTo
+      ? CLOSE_UP_ZOOM
+      : spotlight
+        ? SPOTLIGHT_ZOOM
+        : 1 + (CAMERA_PULL_BACK * jeep.speed) / CRUISE_SPEED;
     zoom = blend >= 1 ? targetZoom : THREE.MathUtils.damp(zoom, targetZoom, CAMERA_ZOOM_RATE, delta);
     const focus = spotlight?.point ?? jeep.position;
     offset.copy(CAMERA_OFFSET).multiplyScalar(zoom);
@@ -824,10 +969,17 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       // and a load is followed by where to take it, or where to fetch the right thing. Reading a card, she finishes it:
       // a bubble or a load's chime says enough.
       const quiet =
-        (helping && event.type === 'need') || (inspecting && (event.type === 'need' || event.type === 'load'));
+        (helping && event.type === 'need') ||
+        ((inspecting || closeUp) && (event.type === 'need' || event.type === 'load'));
+      // Food or a drink, delivered, can be given by hand in a close-up, which she explains after her cheer.
+      const next = closeUp ? null : closeUpAfter(event, care);
+      const starts = next !== null && startCloseUp(next);
       if (!quiet) {
         const helped = helping && event.type === 'load' && !tourStep(care, driven);
-        say(...(helped ? nextHint(care, PARK, driven).beats : rosieSays(event, care)));
+        say(
+          ...(helped ? nextHint(care, PARK, driven).beats : rosieSays(event, care)),
+          ...(starts && next ? [rosieOnCloseUp(next)] : []),
+        );
       }
       if (event.type === 'need') {
         playNeed(mixer);
@@ -898,6 +1050,15 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       arrow.rotation.y += delta * 2;
     }
     canvas.dataset.pointer = pointAt ? (hint.kind ?? '') : '';
+    if (pointAt) {
+      onScreen.copy(arrow.position).project(camera);
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.round(((onScreen.x + 1) / 2) * rect.width);
+      const y = Math.round(((1 - onScreen.y) / 2) * rect.height);
+      canvas.dataset.arrow = `${x},${y}`;
+    } else {
+      canvas.dataset.arrow = '';
+    }
 
     sinceProgress += delta;
     const nowStuck = !helping && hint.target !== null && sinceProgress >= STUCK_SECONDS;
@@ -915,9 +1076,9 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     timer.update();
     const delta = Math.min(timer.getDelta(), 0.1);
 
-    // A held key or stick steers like a held finger, though a finger on the screen wins.
+    // A held key or stick steers like a held finger, though a finger on the screen wins, and not in a close-up.
     const way = steering.direction();
-    if (way && !press) {
+    if (way && !press && !closeUp) {
       sinceSteer += delta;
       if (sinceSteer >= HOLD_REPLAN_SECONDS) {
         sinceSteer = 0;
@@ -934,7 +1095,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       honk();
     }
 
-    if (press && (press.holding || performance.now() - press.at > TAP_MS)) {
+    if (press && !closeUp && (press.holding || performance.now() - press.at > TAP_MS)) {
       press.holding = true;
       sinceReplan += delta;
       if (sinceReplan >= HOLD_REPLAN_SECONDS) {
@@ -960,6 +1121,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     updateBedtime(delta);
     updateLooking(delta);
     updateHearts(delta);
+    updateCloseUp(delta);
 
     sun.position.set(jeep.position.x + 15, 30, jeep.position.z + 10);
     sun.target.position.set(jeep.position.x, 0, jeep.position.z);
@@ -997,6 +1159,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       return;
     }
     playHonk(mixer);
+    // In a close-up the dinosaur stays facing the food, whose mouth was measured as the close-up opened.
+    if (closeUp) {
+      return;
+    }
     // Rosie rides in the jeep, so only dinosaurs standing in the park itself can turn to look, and not hatchlings
     // about to run to their pen, whose run sets their heading.
     const walking = new Set(walks.flatMap((walk) => walk.herd));
@@ -1137,6 +1303,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       return inspecting.fact;
     },
     closeCard,
+    endCloseUp,
     wake() {
       if (!bedtime.asleep) {
         return;

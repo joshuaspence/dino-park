@@ -10,6 +10,7 @@ import {
   supplyFor,
   tutorialStep,
 } from './needs';
+import { type CloseUp, closeUpFinished } from './closeUp';
 import { ROSIE_FACTS, SPECIES_FACTS } from './facts';
 import type { Subject } from './inspect';
 import type { StationKind } from './park';
@@ -59,6 +60,14 @@ const STATION_NAMES: Readonly<Record<StationKind, string>> = {
   bath: 'bath',
   toys: 'toy shed',
   vet: 'vet tent',
+};
+
+/** What the child holds out in a feeding close-up, for "Drag the… to…". */
+const FEED_ITEMS: Readonly<Partial<Record<StationKind, string>>> = {
+  hay: 'the hay',
+  meat: 'the meat',
+  fish: 'the fish',
+  water: 'the water',
 };
 
 const CHEERS = ['Hooray!', 'Yay, well done!', 'They love it!'];
@@ -119,6 +128,14 @@ export function rosieLines(): ReadonlyMap<LineId, string> {
     lines.set(`rosie.hatch.${species}`, `Look, it's ${SPECIES[species].residentName}! Welcome to the park!`);
     // A pat (docs/design.md §3), now and then.
     lines.set(`rosie.pat.${species}`, `${name} ${verb === 'are' ? 'love' : 'loves'} a tickle!`);
+    // Feeding by hand, after food or a drink is delivered (docs/design.md §3).
+    const resident = SPECIES[species].residentName;
+    for (const kind of ['hungry', 'thirsty'] as const) {
+      const item = supplyFor(kind, species);
+      const offer = kind === 'thirsty' ? `give ${resident} a drink` : `feed ${resident}`;
+      lines.set(`rosie.feed.${species}.${item}`, `Let's ${offer}! Drag ${FEED_ITEMS[item] ?? ''} to ${resident}!`);
+    }
+    lines.set(`rosie.fed.${species}`, `Yum! ${name} ${verb === 'are' ? 'love' : 'loves'} it!`);
   }
   for (const [kind, supply] of Object.entries(SUPPLIES)) {
     lines.set(`rosie.load.${kind}`, `Got ${supply}!`);
@@ -195,6 +212,11 @@ export function rosieOnCard(subject: Subject, care: Care, fact: number): readonl
   }
   const facts = ROSIE_FACTS.facts.length;
   return [{ line: 'rosie.about.rosie' }, { line: `rosie.fact.rosie.${((fact % facts) + facts) % facts}` }];
+}
+
+/** What Rosie says as a close-up starts, to say what to do, and once it's finished. */
+export function rosieOnCloseUp(closeUp: CloseUp): LineId {
+  return closeUpFinished(closeUp) ? `rosie.fed.${closeUp.species}` : `rosie.feed.${closeUp.species}.${closeUp.item}`;
 }
 
 /** What Rosie says when the game starts: a hello for a new park, a welcome back for one with progress. */

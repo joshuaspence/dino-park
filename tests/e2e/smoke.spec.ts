@@ -895,6 +895,99 @@ test('a tap on a dinosaur, with the jeep stopped at its pen, pats it', async ({ 
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.pat.trex');
 });
 
+test('after a drink is delivered, the child gives it to the dinosaur by hand', async ({ page }) => {
+  test.slow();
+  const { canvas, at } = await openPlayedPark(page);
+  const attr = (name: string) => canvas.getAttribute(name);
+  /** Plays until the jeep has set off and stopped again. */
+  const arrive = async () => {
+    await playFor(page, 300);
+    await playFor(page, 15_000, async () => (await attr('data-moving')) === 'false');
+  };
+  const point = async (name: string) => {
+    const [x = 0, y = 0] = ((await attr(name)) ?? '').split(',').map(Number);
+    return { x, y };
+  };
+  await page.getByRole('button', { name: strings.honk }).click();
+  // In a played park, Bruno is the first to want something: a drink.
+  await playFor(page, 6000, async () => (await attr('data-needs')) !== '');
+  await expect(canvas).toHaveAttribute('data-needs', 'brontosaurus:thirsty');
+  // Rosie says so, and the camera settles back on the jeep.
+  await playFor(page, 10_000, async () => (await attr('data-speaking')) === 'false');
+  await playFor(page, 3000);
+  // Asked for help, Rosie shows where to go, with the arrow over it, and a tap on the arrow goes there.
+  const followArrow = async () => {
+    await page.getByRole('button', { name: strings.help }).click();
+    // She names the dinosaur first, then the place, and the camera moves to each.
+    const onScreen = async () => {
+      const { x, y } = await point('data-arrow');
+      return (await attr('data-arrow')) !== '' && x > 50 && x < 1130 && y > 50 && y < 770;
+    };
+    await playFor(page, 15_000, async () => (await attr('data-spotlight')) === 'true' && (await onScreen()));
+    // The clock is paused, so the arrow is where the last frame drew it when the tap lands.
+    expect(await onScreen()).toBe(true);
+    await canvas.click({ position: await point('data-arrow') });
+    await arrive();
+  };
+  // The water tower is up and to the left, its arrow too close to the corner to tap.
+  await canvas.click({ position: at(0.065, 0.15) });
+  await arrive();
+  await expect(canvas).toHaveAttribute('data-cargo', 'water');
+  await playFor(page, 10_000, async () => (await attr('data-speaking')) === 'false');
+  await followArrow();
+  await playFor(page, 1000);
+
+  // Delivered, the camera moves in on Bruno, and Rosie says what to do.
+  await expect(canvas).toHaveAttribute('data-close-up', 'feed');
+  await expect(canvas).toHaveAttribute('data-rosie', /rosie\.feed\.brontosaurus\.water$/);
+  const back = page.getByRole('button', { name: strings.backToPark });
+  await expect(back).toBeVisible();
+
+  // A tap on the water sends it to his mouth, for children who can't drag yet.
+  const water = await point('data-food');
+  await canvas.click({ position: water });
+  await playFor(page, 600);
+  await expect(canvas).toHaveAttribute('data-bites', '1');
+  // A drag to his mouth does too, and a drag that misses floats back.
+  const box = await canvas.boundingBox();
+  /** Drags the food to `to` in `steps` moves: many small ones are a slow drag. */
+  const drag = async (to: { x: number; y: number }, steps = 8) => {
+    const from = await point('data-food');
+    await page.mouse.move((box?.x ?? 0) + from.x, (box?.y ?? 0) + from.y);
+    await page.mouse.down();
+    for (let step = 1; step <= steps; step++) {
+      await page.mouse.move(
+        (box?.x ?? 0) + from.x + ((to.x - from.x) * step) / steps,
+        (box?.y ?? 0) + from.y + ((to.y - from.y) * step) / steps,
+      );
+      await page.clock.fastForward(30);
+    }
+    await page.mouse.up();
+    await playFor(page, 600);
+  };
+  await drag(at(0.95, 0.9));
+  await expect(canvas).toHaveAttribute('data-bites', '1');
+  // However slowly.
+  await drag(at(0.95, 0.9), 80);
+  await expect(canvas).toHaveAttribute('data-bites', '1');
+  // A press the browser takes over (an edge swipe, palm rejection) lets go of it too, so it can be picked up again.
+  const held = await point('data-food');
+  await page.mouse.move((box?.x ?? 0) + held.x, (box?.y ?? 0) + held.y);
+  await page.mouse.down();
+  await canvas.dispatchEvent('pointercancel', { pointerId: 1, isPrimary: true });
+  await page.mouse.up();
+  await playFor(page, 600);
+  await expect(canvas).toHaveAttribute('data-bites', '1');
+  await drag(await point('data-mouth'));
+  await expect(canvas).toHaveAttribute('data-bites', '2');
+  await drag(await point('data-mouth'));
+
+  // Three sips and he's had enough: Rosie says so, and it's back to the park.
+  await expect(canvas).toHaveAttribute('data-close-up', '');
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.fed.brontosaurus');
+  await expect(back).toBeHidden();
+});
+
 test('a double tap opens a card about a station, the egg nest or Rosie', async ({ page }) => {
   test.slow();
   const { canvas, at } = await openPlayedPark(page);
