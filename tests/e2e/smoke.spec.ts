@@ -966,6 +966,14 @@ test('after a drink is delivered, the child gives it to the dinosaur by hand', a
   };
   await drag(at(0.95, 0.9));
   await expect(canvas).toHaveAttribute('data-bites', '1');
+  // A press the browser takes over (an edge swipe, palm rejection) lets go of it too, so it can be picked up again.
+  const held = await point('data-food');
+  await page.mouse.move((box?.x ?? 0) + held.x, (box?.y ?? 0) + held.y);
+  await page.mouse.down();
+  await canvas.dispatchEvent('pointercancel', { pointerId: 1, isPrimary: true });
+  await page.mouse.up();
+  await playFor(page, 600);
+  await expect(canvas).toHaveAttribute('data-bites', '1');
   await drag(await point('data-mouth'));
   await expect(canvas).toHaveAttribute('data-bites', '2');
   await drag(await point('data-mouth'));

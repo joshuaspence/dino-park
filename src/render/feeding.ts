@@ -53,6 +53,8 @@ export interface Feeding {
    * children who can't drag yet. Anywhere else it floats back.
    */
   release(clientX: number, clientY: number, tapped: boolean): void;
+  /** The browser took the press over (an edge swipe, palm rejection): the food floats back. */
+  cancel(): void;
   /** Moves the food on. True on the frame a bite lands. */
   update(delta: number): boolean;
   /** Where the food and the mouth are on the canvas, in CSS pixels. */
@@ -131,6 +133,11 @@ export function createFeeding(scene: THREE.Scene, camera: THREE.Camera, canvas: 
       plane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(projected), rest);
       if (raycaster.ray.intersectPlane(plane, hit)) {
         food.position.copy(hit);
+      }
+    },
+    cancel() {
+      if (state === 'held') {
+        flyFrom('returning');
       }
     },
     release(clientX, clientY, tapped) {

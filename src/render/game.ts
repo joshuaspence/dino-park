@@ -774,6 +774,9 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   /** A press the browser took over (an edge swipe, palm rejection) goes nowhere. */
   function onPointerCancel(event: PointerEvent): void {
     if (press && event.pointerId === press.id) {
+      if (press.feeding) {
+        feeding.cancel();
+      }
       press = null;
     }
   }
