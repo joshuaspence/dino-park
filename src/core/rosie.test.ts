@@ -148,7 +148,7 @@ describe('Ranger Rosie', () => {
     expect(said(rosieOnCard({ nest: true }, { ...played, needsMet: NEEDS_PER_EGG }, 0))).toEqual(['rosie.egg.ready']);
     expect(said(rosieOnCard({ rosie: true }, played, 4))).toEqual(['rosie.about.rosie', 'rosie.fact.rosie.1']);
     expect(said(rosieOnCard({ dinosaur: 'trex' }, played, 0))[0]).toBe('rosie.about.trex');
-    expect(lines.get('rosie.about.rosie')).toBe("That's me, Ranger Rosie! I'm a Parasaurolophus.");
+    expect(lines.get('rosie.about.rosie')).toBe("That's me, Ranger Rosie! I'm a park ranger.");
     for (let fact = 0; fact < 3; fact++) {
       expect(lines.get(`rosie.fact.rosie.${fact}`)).toBeTruthy();
     }

@@ -31,9 +31,6 @@ export const LAUNCH_SPECIES: readonly SpeciesId[] = ['triceratops', 'brontosauru
 /** Hatched from eggs, in this order. */
 export const UNLOCK_ORDER: readonly SpeciesId[] = ['velociraptor', 'pterodactyl', 'ankylosaurus'];
 
-/** Ranger Rosie, the mascot, is a Parasaurolophus and rides in the jeep rather than living in a pen. */
-export const ROSIE_MODEL = 'parasaurolophus';
-
 /** The species living in the park once `eggsHatched` eggs have hatched. */
 export function speciesInPark(eggsHatched: number): SpeciesId[] {
   const count = Number.isFinite(eggsHatched) ? Math.max(0, Math.floor(eggsHatched)) : 0;

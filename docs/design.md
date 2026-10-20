@@ -143,11 +143,13 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
 - Gameplay has **no text** a child needs: needs, stations and buttons are pictures. An info card's
   small captions are for grown-ups, and Rosie reads the card aloud. The little text that exists
   (parent area, settings) lives in string files, in **Australian English**.
-- **Ranger Rosie** is the mascot: a cheerful **Parasaurolophus** in a ranger hat who rides in the
-  passenger seat. Her crest makes her silhouette unmistakable, and she honks through it. She speaks
-  short lines ("Trixie is hungry! Let's get some hay!"), runs the guided tour ("Tap the toy
-  shed!"), points at needs and cheers deliveries. She never takes control or blocks a tap.
-  (Because Rosie is a Parasaurolophus, it is not in the unlock list.)
+- **Ranger Rosie** is the mascot: a cheerful **human park ranger** in a wide-brimmed ranger hat who
+  rides standing in the back of the jeep. She's a person, not a dinosaur, so children can see she's
+  the one looking after the animals with them, and her big hat makes her easy to spot. She is built
+  from primitives like the jeep (`render/rosieModel.ts`), and hops with her arms up when a dinosaur
+  is helped. She speaks short lines ("Trixie is hungry! Let's get some hay!"), runs the guided tour
+  ("Tap the toy shed!"), points at needs and cheers deliveries. She never takes control or blocks a
+  tap.
 - The **child is the driver**: a small helmeted figure in the jeep. Choosing the jeep colour is the
   only customisation (M3).
 - **Voice lines** are keyed by ID (`rosie.need.triceratops.hungry` → audio file). M1 uses
@@ -199,11 +201,11 @@ Most under-5s can't steer with a virtual joystick, so the jeep drives itself.
   tap on the park, or the close button, closes it.
 - **Stations, the egg nest and Rosie have cards too.** A station's card shows the bubble it's for
   and a happy face, and Rosie says what it's for ("This is the toy shed. Bored dinosaurs love a toy
-  to play with!"). The nest's shows one egg step for each dinosaur helped towards the next egg,
-  and who's inside stays a surprise. Rosie's own card, from a double tap on the jeep, introduces
-  her as a Parasaurolophus, with facts like any dinosaur's. A double tap's first tap sets off to
-  drive like any tap, so the jeep pulls over when the card opens: asking about a place isn't
-  going there.
+  to play with!"). The nest's shows one egg step for each dinosaur helped towards the next egg, and
+  who's inside stays a surprise. Rosie's own card, from a double tap on the jeep, introduces her as
+  a park ranger, with three facts about what rangers do in place of a species'. A double tap's first
+  tap sets off to drive like any tap, so the jeep pulls over when the card opens: asking about a
+  place isn't going there.
 - **Each dinosaur has its own voice** (roar, chirp, honk) for wanting something, being helped and
   sleeping, so children can hear who needs help.
 - **Gentle looping background music**, plus sound effects. Most effects (honk, engine, chimes,
@@ -247,18 +249,18 @@ the park, the one thing here that can't be undone, asks a named number of its ow
   `public/models/`, and `CREDITS.md` records each file's source and licence.
 - Models are loaded behind a **`DinoSkin`** interface so commissioned or Blender-made models can
   replace the packs without code changes.
-- **Asset audit (M1).** Quaternius's
-  [Animated Dinosaur Pack](https://quaternius.com/packs/animateddinosaurs.html) covers Triceratops,
-  Apatosaurus (used for the Brontosaurus), Stegosaurus, T. rex, Velociraptor and Parasaurolophus
-  (Rosie), each with Idle, Walk, Run, Jump, Attack and Death clips. `scripts/import-dinos.mjs`
-  converts it, keeps only idle/walk/run/jump — **jump is the happy hop** — and Meshopt-compresses it
-  (about 1.2 MB for all six). The models share one unit, so one scale keeps their relative sizes;
-  Rosie is scaled up because the pack's Parasaurolophus is small. Dinosaurs are **larger than
-  life** next to the jeep (a T. rex is about 7.7 m long) because big, readable animals matter more
-  to small children than true scale. Recolours are keyed by the pack's
-  material names. **Pterodactyl and Ankylosaurus have no model yet**: find one before M2, otherwise
-  build them procedurally. Until then their eggs, like any egg after everything has hatched, bring
-  out a half-size baby of a launch dinosaur, so an egg is never empty.
+- **Asset audit (M1).** Quaternius's [Animated Dinosaur
+  Pack](https://quaternius.com/packs/animateddinosaurs.html) covers Triceratops, Apatosaurus (used
+  for the Brontosaurus), Stegosaurus, T. rex, Velociraptor and Parasaurolophus (not used yet: it was
+  Rosie until she became a person), each with Idle, Walk, Run, Jump, Attack and Death clips.
+  `scripts/import-dinos.mjs` converts it, keeps only idle/walk/run/jump — **jump is the happy hop**
+  — and Meshopt-compresses it (about 1 MB for the five it uses). The models share one unit, so one
+  scale keeps their relative sizes. Dinosaurs are **larger than life** next to the jeep (a T. rex is
+  about 7.7 m long) because big, readable animals matter more to small children than true scale.
+  Recolours are keyed by the pack's material names. **Pterodactyl and Ankylosaurus have no model
+  yet**: find one before M2, otherwise build them procedurally. Until then their eggs, like any egg
+  after everything has hatched, bring out a half-size baby of a launch dinosaur, so an egg is never
+  empty.
 
 ## 9. Tech stack
 
