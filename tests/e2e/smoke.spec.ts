@@ -150,6 +150,21 @@ test('loads the toy shed when the jeep stops there', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-cargo', 'toys');
 });
 
+test('drives to a station when its floating sign is tapped', async ({ page }) => {
+  await page.clock.install();
+  await page.goto('./');
+  const canvas = page.locator('canvas.world');
+  await expect(canvas).toHaveAttribute('data-ready', 'true');
+  const box = await canvas.boundingBox();
+  if (!box) {
+    throw new Error('Canvas has no size');
+  }
+  // The toy shed's ball floats well above it: the ground under the ball is too far from the shed to count as it.
+  await canvas.click({ position: { x: box.width * 0.33, y: box.height * 0.255 } });
+  await playFor(page, 6000, async () => (await canvas.getAttribute('data-cargo')) === 'toys');
+  await expect(canvas).toHaveAttribute('data-cargo', 'toys');
+});
+
 test('saves a hatched egg and remembers it after a reload', async ({ page }) => {
   test.slow();
   await page.clock.install();
@@ -712,6 +727,8 @@ test('Rosie walks a new player through their first delivery, showing them each p
     await expect(canvas).toHaveAttribute('data-speaking', 'false', { timeout: 30_000 });
     await playFor(page, 4000, async () => (await canvas.getAttribute('data-spotlight')) === 'false');
     await expect(canvas).toHaveAttribute('data-spotlight', 'false');
+    // The camera eases back to the jeep over a second or so.
+    await playFor(page, 2000);
   };
 
   // The first tap lets sound start. Rosie says hello and asks for a drive, with an arrow up the middle road; nobody
@@ -733,8 +750,8 @@ test('Rosie walks a new player through their first delivery, showing them each p
   await expect(canvas).toHaveAttribute('data-spotlight', 'true');
   await listen();
 
-  // The arrow is over the toy shed, down and to the left of the jeep now.
-  await tap(0.26, 0.58);
+  // The arrow is over the toy shed's sign, down and to the left of the jeep now.
+  await tap(0.27, 0.41);
   await playFor(page, 6000, async () => (await canvas.getAttribute('data-cargo')) === 'toys');
   await expect(canvas).toHaveAttribute('data-cargo', 'toys');
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.tutorial.load');
@@ -754,7 +771,27 @@ test('Rosie walks a new player through their first delivery, showing them each p
   ]);
 });
 
-/** Opens a park past the guided tour, and returns the canvas and a position on it as fractions of its size. */
+/**
+ * Pauses the installed clock a little ahead of the page's time. The pause has to be in the page's future, which keeps
+ * moving while the call is under way, so it allows a margin and tries again if a slow runner overtakes even that.
+ */
+async function pauseClock(page: Page): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 10_000);
+      return;
+    } catch (error) {
+      if (attempt >= 2) {
+        throw error;
+      }
+    }
+  }
+}
+
+/**
+ * Opens a park past the guided tour, with the clock paused, and returns the canvas and a position on it as fractions of
+ * its size.
+ */
 async function openPlayedPark(page: Page) {
   await page.clock.install();
   await page.goto('./');
@@ -762,6 +799,9 @@ async function openPlayedPark(page: Page) {
   await page.reload();
   const canvas = page.locator('canvas.world');
   await expect(canvas).toHaveAttribute('data-ready', 'true');
+  // An installed clock still runs in real time, and CI's software WebKit can take seconds over a dblclick, leaving its
+  // two clicks further apart than a double tap. Paused, game time moves only when the test plays it.
+  await pauseClock(page);
   const box = await canvas.boundingBox();
   if (!box) {
     throw new Error('Canvas has no size');
@@ -773,17 +813,33 @@ async function openPlayedPark(page: Page) {
 async function closeCard(page: Page, card: Locator): Promise<void> {
   await card.getByRole('button', { name: strings.close }).click();
   await expect(card).toBeHidden();
+  // The canvas's attributes catch up on the next frame.
+  await playFor(page, 200);
+}
+
+/**
+ * Double-taps `position` once the jeep has stopped and the camera has eased back onto it, so the tap lands where the
+ * test expects whatever came before.
+ */
+async function doubleTap(page: Page, canvas: Locator, position: { x: number; y: number }): Promise<void> {
   await playFor(page, 2000);
+  await expect(canvas).toHaveAttribute('data-moving', 'false');
+  await expect(canvas).toHaveAttribute('data-spotlight', 'false');
+  await canvas.dblclick({ position });
+  // The canvas's attributes catch up on the next frame.
+  await playFor(page, 200);
 }
 
 test('a double tap on a dinosaur opens its card, which Rosie reads aloud', async ({ page }) => {
+  // It plays about 15 s of game time over several cards, which CI's software rendering takes over a minute for.
+  test.slow();
   const { canvas, at } = await openPlayedPark(page);
   // Rex's pen is down and to the right of where the jeep starts.
   const rex = at(0.85, 0.75);
   const card = page.getByRole('region', { name: strings.cardTitle('Rex') });
 
   // The double tap's first tap sets off for the pen, but asking about Rex isn't going there: the jeep stops.
-  await canvas.dblclick({ position: rex });
+  await doubleTap(page, canvas, rex);
   await playFor(page, 200);
   await expect(card).toBeVisible();
   await expect(canvas).toHaveAttribute('data-inspecting', 'trex');
@@ -809,7 +865,7 @@ test('a double tap on a dinosaur opens its card, which Rosie reads aloud', async
   await expect(canvas).toHaveAttribute('data-spotlight', 'false');
 
   // A tap on the park closes it too, and drives as a tap always does. A single tap opens nothing.
-  await canvas.dblclick({ position: rex });
+  await doubleTap(page, canvas, rex);
   await expect(card).toBeVisible();
   await canvas.click({ position: at(0.5, 0.4) });
   await expect(card).toBeHidden();
@@ -819,11 +875,12 @@ test('a double tap on a dinosaur opens its card, which Rosie reads aloud', async
 });
 
 test('a double tap opens a card about a station, the egg nest or Rosie', async ({ page }) => {
+  test.slow();
   const { canvas, at } = await openPlayedPark(page);
 
   // The toy shed is up and to the left of the jeep. Asking about it doesn't drive there and load a toy.
   const shed = page.getByRole('region', { name: strings.cardTitle(strings.stations.toys) });
-  await canvas.dblclick({ position: at(0.34, 0.38) });
+  await doubleTap(page, canvas, at(0.34, 0.38));
   await expect(shed).toBeVisible();
   await expect(canvas).toHaveAttribute('data-inspecting', 'station.toys');
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.about.station.toys');
@@ -834,7 +891,7 @@ test('a double tap opens a card about a station, the egg nest or Rosie', async (
 
   // The nest is up the cross road, with three of five dinosaurs helped towards its egg.
   const nest = page.getByRole('region', { name: strings.cardTitle(strings.nest) });
-  await canvas.dblclick({ position: at(0.59, 0.18) });
+  await doubleTap(page, canvas, at(0.59, 0.18));
   await expect(nest).toBeVisible();
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.about.nest');
   await expect(nest.getByRole('meter')).toHaveAttribute('aria-valuenow', '3');
@@ -842,7 +899,7 @@ test('a double tap opens a card about a station, the egg nest or Rosie', async (
 
   // Rosie rides in the jeep.
   const rosie = page.getByRole('region', { name: strings.cardTitle(strings.rosie) });
-  await canvas.dblclick({ position: at(0.54, 0.47) });
+  await doubleTap(page, canvas, at(0.54, 0.47));
   await expect(rosie).toBeVisible();
   await expect(canvas).toHaveAttribute('data-inspecting', 'rosie');
   await expect(canvas).toHaveAttribute('data-rosie', 'rosie.about.rosie rosie.fact.rosie.0');

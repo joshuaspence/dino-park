@@ -17,10 +17,10 @@ import { LAUNCH_SPECIES, ROSIE_MODEL, SPECIES, type SpeciesId, UNLOCK_ORDER, spe
 import { nextHint } from '../core/help';
 import { holdUntilDriven, tourStep } from '../core/tour';
 import { type DinoInstance, type DinoSkin, loadDinoSkin } from './dinoSkin';
-import { cargoIcon, iconMaterial, needIcon } from './icons';
+import { cargoIcon, iconMaterial, needIcon, stationIcon } from './icons';
 import { buildJeep } from './jeepModel';
 import { loadPark, storePark } from '../storage/parkStore';
-import { buildPark } from './parkScene';
+import { STATION_TOPS, buildPark } from './parkScene';
 import { startSteering } from './steering';
 
 export interface GameHandle {
@@ -109,6 +109,9 @@ const EGG_FULL_SIZE = 1.5;
 const SHELL_SECONDS = 1.2;
 /** The guided tour's arrow floats this high over what to tap next, bobbing to catch the eye. */
 const ARROW_HEIGHT = 4.5;
+/** Each station's sign floats this far above it, at this size: smaller than a bubble, so it reads as a sign. */
+const SIGN_GAP = 1.6;
+const SIGN_SIZE = 2.2;
 /** A tap this close to the arrow on screen, in CSS pixels, is a tap on what it points at. */
 const ARROW_TAP_PX = 48;
 /** How long without loading, delivering or hatching, while there's something to do, before the child seems stuck. */
@@ -234,6 +237,14 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     bubble.visible = false;
     scene.add(bubble);
     return bubble;
+  });
+  // Over each station, the picture of the bubble it answers, so a child can match the two by eye (docs/design.md §3).
+  const signs = PARK.stations.map((station) => {
+    const sign = new THREE.Sprite(iconMaterial(stationIcon(station.kind)));
+    sign.scale.setScalar(SIGN_SIZE);
+    sign.position.set(station.position.x, STATION_TOPS[station.kind] + SIGN_GAP, station.position.z);
+    scene.add(sign);
+    return { sign, station };
   });
   // Floating over the jeep, clear of Rosie and the roll bar, so the child can see what they're carrying.
   const cargo = new THREE.Sprite();
@@ -441,19 +452,25 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   let pointAt: Point | undefined;
   const onScreen = new THREE.Vector3();
 
-  /**
-   * What the arrow points at, when a tap lands on or near it. The arrow floats well above the ground, so the ground
-   * under a tap on it is somewhere else entirely, and a child who taps the arrow means what it points at.
-   */
-  function arrowTargetAt(clientX: number, clientY: number): Point | null {
-    if (!pointAt || !arrow.visible) {
-      return null;
-    }
+  /** How far a tap at `clientX`, `clientY` is from `object` on screen, in CSS pixels. */
+  function screenDistance(object: THREE.Object3D, clientX: number, clientY: number): number {
     const rect = canvas.getBoundingClientRect();
-    onScreen.copy(arrow.position).project(camera);
+    onScreen.copy(object.position).project(camera);
     const x = rect.left + ((onScreen.x + 1) / 2) * rect.width;
     const y = rect.top + ((1 - onScreen.y) / 2) * rect.height;
-    return Math.hypot(clientX - x, clientY - y) <= ARROW_TAP_PX ? pointAt : null;
+    return Math.hypot(clientX - x, clientY - y);
+  }
+
+  /**
+   * What the arrow, or a station's sign, stands for when a tap lands on or near it. Both float well above the ground,
+   * so the ground under a tap on them is somewhere else entirely, and a child who taps one means what it shows.
+   */
+  function floatingTargetAt(clientX: number, clientY: number): Point | null {
+    if (pointAt && arrow.visible && screenDistance(arrow, clientX, clientY) <= ARROW_TAP_PX) {
+      return pointAt;
+    }
+    const sign = signs.find(({ sign }) => screenDistance(sign, clientX, clientY) <= ARROW_TAP_PX);
+    return sign?.station.position ?? null;
   }
 
   function groundPointAt(clientX: number, clientY: number): Point | null {
@@ -495,7 +512,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
   }
 
   /**
-   * A double tap at `clientX`, `clientY`, over `point` on the ground, opens the card of whatever is there. The jeep
+   * A double tap at `clientX`, `clientY`, meaning `point` on the ground, opens the card of whatever is there. The jeep
    * stands well above the ground, so a tap on it is told by where it is on screen.
    */
   function inspect(point: Point, clientX: number, clientY: number): void {
@@ -554,8 +571,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     if (!press.holding) {
       // A tap on the park closes any open card, and still drives; a second tap straight after opens one.
       closeCard();
-      const ground = groundPointAt(event.clientX, event.clientY);
-      const target = arrowTargetAt(event.clientX, event.clientY) ?? ground;
+      const target = floatingTargetAt(event.clientX, event.clientY) ?? groundPointAt(event.clientX, event.clientY);
       if (target) {
         driveTowards(snapToDestination(target));
       }
@@ -565,8 +581,9 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
         now - lastTap.at <= DOUBLE_TAP_MS &&
         Math.hypot(event.clientX - lastTap.x, event.clientY - lastTap.y) <= DOUBLE_TAP_PX;
       lastTap = double ? null : { x: event.clientX, y: event.clientY, at: now };
-      if (double && ground) {
-        inspect(ground, event.clientX, event.clientY);
+      // A double tap on a sign opens its station's card, as one on the station would.
+      if (double && target) {
+        inspect(target, event.clientX, event.clientY);
       }
     }
     press = null;
@@ -795,7 +812,10 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
     pointAt = (tourStep(care, driven) || helping) && hint.target ? hint.target : undefined;
     arrow.visible = pointAt !== undefined;
     if (pointAt) {
-      arrow.position.set(pointAt.x, ARROW_HEIGHT + Math.sin(timer.getElapsed() * 4) * 0.4, pointAt.z);
+      // Over a station, the arrow rises above its sign.
+      const signed = signs.find(({ station }) => station.position === pointAt);
+      const height = signed ? Math.max(ARROW_HEIGHT, signed.sign.position.y + SIGN_SIZE) : ARROW_HEIGHT;
+      arrow.position.set(pointAt.x, height + Math.sin(timer.getElapsed() * 4) * 0.4, pointAt.z);
       arrow.rotation.y += delta * 2;
     }
     canvas.dataset.pointer = pointAt ? (hint.kind ?? '') : '';
