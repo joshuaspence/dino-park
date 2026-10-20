@@ -81,6 +81,11 @@ score.**
 - Needs only advance **while the game is open**. There is no real-time clock: dinosaurs never go
   hungry while the app is closed, and nothing nags the child to come back.
 - Each need met earns progress towards an **egg**.
+- **Patting.** With the jeep stopped at a pen's gate, a tap on the dinosaur inside pats it: it
+  giggles (a synthesised chirp and its own happy call) and hops, and hearts float up. Now and then,
+  at most every 20 seconds and never during the tour or over another line, Rosie says how much it
+  loves a tickle ("Rex loves a tickle!"). A pat is just for fun: it meets no need and fills no
+  meter, and the jeep stays where it is.
 - Out of scope for M1: hand-feeding or brushing mini-games (see M3).
 
 ## 4. Driving, controls and camera

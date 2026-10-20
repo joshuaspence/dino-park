@@ -4,8 +4,8 @@ import type { NeedKind } from '../core/needs';
 import type { StationKind } from '../core/park';
 import { type Diet, SPECIES, type SpeciesId } from '../core/species';
 
-/** The pictures that stand in for words: what a dinosaur wants, and what the jeep is carrying. */
-export type Icon = 'leaf' | 'meat' | 'fish' | 'drop' | 'mud' | 'ball' | 'bandage' | 'soap';
+/** The pictures that stand in for words: what a dinosaur wants, what the jeep is carrying, and a pat's hearts. */
+export type Icon = 'leaf' | 'meat' | 'fish' | 'drop' | 'mud' | 'ball' | 'bandage' | 'soap' | 'heart';
 
 const FOOD_ICONS: Readonly<Record<Diet, Icon>> = { plants: 'leaf', meat: 'meat', fish: 'fish' };
 
@@ -152,6 +152,14 @@ function draw(ctx: CanvasRenderingContext2D, icon: Icon): void {
       circle(c - 16, c + 2, 5, '#ffffff');
       circle(c + 11, c - 12, 4, '#ffffff');
       break;
+    case 'heart':
+      ctx.beginPath();
+      ctx.moveTo(c, c + 34);
+      ctx.bezierCurveTo(c - 52, c, c - 30, c - 44, c, c - 18);
+      ctx.bezierCurveTo(c + 30, c - 44, c + 52, c, c, c + 34);
+      fill('#ff5e7e');
+      circle(c - 16, c - 14, 6, '#ffc2cf');
+      break;
   }
 }
 
@@ -177,9 +185,15 @@ function drawSadFace(ctx: CanvasRenderingContext2D): void {
 
 const materials = new Map<string, THREE.SpriteMaterial>();
 
-/** A white disc with `icon` on it, plus a tail when it's a speech bubble and a frown when it's sad. */
-export function iconMaterial(icon: Icon, style: { bubble?: boolean; sad?: boolean } = {}): THREE.SpriteMaterial {
-  const key = `${icon}/${style.bubble ? 'bubble' : 'disc'}/${style.sad ? 'sad' : 'calm'}`;
+/**
+ * A white disc with `icon` on it, plus a tail when it's a speech bubble and a frown when it's sad, or `icon` on its own
+ * when it's bare.
+ */
+export function iconMaterial(
+  icon: Icon,
+  style: { bubble?: boolean; sad?: boolean; bare?: boolean } = {},
+): THREE.SpriteMaterial {
+  const key = `${icon}/${style.bare ? 'bare' : style.bubble ? 'bubble' : 'disc'}/${style.sad ? 'sad' : 'calm'}`;
   let material = materials.get(key);
   if (!material) {
     const canvas = document.createElement('canvas');
@@ -188,15 +202,17 @@ export function iconMaterial(icon: Icon, style: { bubble?: boolean; sad?: boolea
     if (!ctx) {
       throw new Error('No 2D canvas context');
     }
-    ctx.beginPath();
-    ctx.arc(CENTRE, CENTRE, 50, 0, 2 * Math.PI);
-    if (style.bubble) {
-      ctx.moveTo(CENTRE - 14, CENTRE + 46);
-      ctx.lineTo(CENTRE, SIZE - 4);
-      ctx.lineTo(CENTRE + 14, CENTRE + 46);
+    if (!style.bare) {
+      ctx.beginPath();
+      ctx.arc(CENTRE, CENTRE, 50, 0, 2 * Math.PI);
+      if (style.bubble) {
+        ctx.moveTo(CENTRE - 14, CENTRE + 46);
+        ctx.lineTo(CENTRE, SIZE - 4);
+        ctx.lineTo(CENTRE + 14, CENTRE + 46);
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
     }
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
     draw(ctx, icon);
     if (style.sad) {
       drawSadFace(ctx);

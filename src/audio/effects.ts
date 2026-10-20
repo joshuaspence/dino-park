@@ -85,6 +85,14 @@ export function playDeliver(mixer: Mixer): void {
   [523, 659, 784, 1047].forEach((frequency, i) => note(mixer, frequency, at + i * 0.09, 0.5, { type: 'triangle' }));
 }
 
+/** A giggle for a pat: quick, bouncing chirps, each a little higher. */
+export function playGiggle(mixer: Mixer): void {
+  const at = mixer.context.currentTime;
+  [880, 1046, 932, 1175, 1046].forEach((frequency, i) =>
+    note(mixer, frequency, at + i * 0.075, 0.12, { type: 'triangle', volume: 0.12 }),
+  );
+}
+
 /** An eggshell crack, then a fanfare with a sparkle on top, for a hatch. */
 export function playHatch(mixer: Mixer): void {
   const { context } = mixer;

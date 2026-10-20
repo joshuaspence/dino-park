@@ -874,6 +874,27 @@ test('a double tap on a dinosaur opens its card, which Rosie reads aloud', async
   await expect(canvas).toHaveAttribute('data-moving', 'true');
 });
 
+test('a tap on a dinosaur, with the jeep stopped at its pen, pats it', async ({ page }) => {
+  test.slow();
+  const { canvas, at } = await openPlayedPark(page);
+  // Rex's pen is down and to the right of where the jeep starts. From afar, a tap there drives to it.
+  await canvas.click({ position: at(0.85, 0.75) });
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-moving', 'true');
+  await expect(canvas).not.toHaveAttribute('data-patted');
+  await playFor(page, 15_000, async () => (await canvas.getAttribute('data-moving')) === 'false');
+  await expect(canvas).toHaveAttribute('data-moving', 'false');
+  // The camera eases round to follow the jeep over a second or so.
+  await playFor(page, 2000);
+
+  // Stopped at the gate, Rex is just below the jeep. A tap on him pats him, and the jeep stays put.
+  await canvas.click({ position: at(0.64, 0.74) });
+  await playFor(page, 200);
+  await expect(canvas).toHaveAttribute('data-patted', 'trex');
+  await expect(canvas).toHaveAttribute('data-moving', 'false');
+  await expect(canvas).toHaveAttribute('data-rosie', 'rosie.pat.trex');
+});
+
 test('a double tap opens a card about a station, the egg nest or Rosie', async ({ page }) => {
   test.slow();
   const { canvas, at } = await openPlayedPark(page);
