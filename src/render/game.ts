@@ -119,8 +119,11 @@ const CAMERA_PULL_BACK = 0.15;
 /** A delivery or hatch draws the camera in this close on the dinosaur or nest, for this long. */
 const SPOTLIGHT_ZOOM = 0.55;
 const SPOTLIGHT_SECONDS = 2.5;
-/** A close-up moves the camera in this close, and lingers on the dinosaur this long once it's finished. */
-const CLOSE_UP_ZOOM = 0.45;
+/**
+ * A close-up moves the camera in this close: washing closer than feeding, which needs room between the jeep and the
+ * mouth. It lingers on the dinosaur this long once it's finished.
+ */
+const CLOSE_UP_ZOOM: Readonly<Record<CloseUp['kind'], number>> = { feed: 0.45, wash: 0.33 };
 const CLOSE_UP_LINGER_SECONDS = 2;
 /** While Rosie talks about a place the camera shows it, and holds there this much longer once she's finished. */
 const FOCUS_LINGER_SECONDS = 0.5;
@@ -870,7 +873,7 @@ export function startGame(canvas: HTMLCanvasElement, mixer: Mixer, hooks: GameHo
       spotlight = { point: closeTo, left: Math.max(spotlight?.left ?? 0, CLOSE_UP_LINGER_SECONDS) };
     }
     const targetZoom = closeTo
-      ? CLOSE_UP_ZOOM
+      ? CLOSE_UP_ZOOM[closeUp?.kind ?? 'feed']
       : spotlight
         ? SPOTLIGHT_ZOOM
         : 1 + (CAMERA_PULL_BACK * jeep.speed) / CRUISE_SPEED;

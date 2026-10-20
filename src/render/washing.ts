@@ -6,8 +6,8 @@ import { type CloseUpView, canvasPoint, formatMark, modelPoints, pointerAt, scre
 import { iconMaterial } from './icons';
 
 /** How big a splat of mud is, and how close on screen, in CSS pixels, a finger must be to rub it. */
-const MUD_SIZE = 1.5;
-const RUB_PX = 90;
+const MUD_SIZE = 1.6;
+const RUB_PX = 70;
 /** The sponge that follows the finger while it rubs. */
 const SPONGE_SIZE = 1.3;
 /** Bubbles rising from the mud as it's rubbed, and in a burst as each splat comes off. */
@@ -19,12 +19,14 @@ const BURST_BUBBLES = 5;
 const BUBBLE_EVERY_PX = 60;
 
 /**
- * Washing a dinosaur (docs/design.md §3): splats of mud along its back, each rubbed off (or tapped twice) with a
+ * Washing a dinosaur (docs/design.md §3): splats of mud along its side, each rubbed off (or tapped twice) with a
  * sponge that follows the finger, in a froth of bubbles.
  */
 export function createWashing(scene: THREE.Scene, camera: THREE.Camera, canvas: HTMLCanvasElement): CloseUpView {
   const splats: { sprite: THREE.Sprite; mud: number }[] = [];
   const bubbles: { sprite: THREE.Sprite; age: number }[] = [];
+  const mudMaterial = iconMaterial('mud', { bare: true }).clone();
+  mudMaterial.depthTest = false;
   const sponge = new THREE.Sprite(iconMaterial('soap'));
   sponge.scale.setScalar(SPONGE_SIZE);
   sponge.visible = false;
@@ -48,23 +50,36 @@ export function createWashing(scene: THREE.Scene, camera: THREE.Camera, canvas: 
     bubbles.push({ sprite, age: 0 });
   }
 
-  /** Rubs `rubbedPx` (or taps) at `clientX`, `clientY`, over every splat near it. */
-  function rub(clientX: number, clientY: number, rubbedPx: number, tapped: boolean): void {
+  /** The muddy splat nearest a finger at `clientX`, `clientY`, if it's close enough to rub. */
+  function splatAt(clientX: number, clientY: number): { sprite: THREE.Sprite; mud: number } | undefined {
+    let nearest: { sprite: THREE.Sprite; mud: number } | undefined;
+    let nearestGap = RUB_PX;
     for (const splat of splats) {
-      if (splat.mud <= 0 || screenGap(canvas, camera, splat.sprite.position, clientX, clientY) > RUB_PX) {
-        continue;
+      const gap = screenGap(canvas, camera, splat.sprite.position, clientX, clientY);
+      if (splat.mud > 0 && gap <= nearestGap) {
+        nearest = splat;
+        nearestGap = gap;
       }
-      splat.mud = scrub(splat.mud, rubbedPx, tapped);
-      splat.sprite.scale.setScalar(MUD_SIZE * (0.4 + 0.6 * splat.mud));
-      if (splat.mud <= 0) {
-        splat.sprite.visible = false;
-        washed += 1;
-        for (let i = 0; i < BURST_BUBBLES; i++) {
-          bubbleAt(splat.sprite.position, 1.2);
-        }
-      } else if (tapped) {
-        bubbleAt(splat.sprite.position, 0.6);
+    }
+    return nearest;
+  }
+
+  /** Rubs `rubbedPx` (or taps) at `clientX`, `clientY`, on the splat nearest it: one at a time, so each counts. */
+  function rub(clientX: number, clientY: number, rubbedPx: number, tapped: boolean): void {
+    const splat = splatAt(clientX, clientY);
+    if (!splat) {
+      return;
+    }
+    splat.mud = scrub(splat.mud, rubbedPx, tapped);
+    splat.sprite.scale.setScalar(MUD_SIZE * (0.4 + 0.6 * splat.mud));
+    if (splat.mud <= 0) {
+      splat.sprite.visible = false;
+      washed += 1;
+      for (let i = 0; i < BURST_BUBBLES; i++) {
+        bubbleAt(splat.sprite.position, 1.2);
       }
+    } else if (tapped) {
+      bubbleAt(splat.sprite.position, 0.6);
     }
   }
 
@@ -82,23 +97,33 @@ export function createWashing(scene: THREE.Scene, camera: THREE.Camera, canvas: 
       if (!first) {
         return;
       }
-      // Splats spread evenly along its back, nose to tail: on each stretch, on its highest point.
+      // Splats spread evenly along its body, nose to tail: on each stretch, on the side the camera sees, a little
+      // above the middle, so they sit on its body rather than on spikes and plates.
       const { points, reach } = modelPoints(first.object);
       const front = Math.max(...reach);
       const back = Math.min(...reach);
       const count = CLOSE_UP_GOALS.wash;
+      const toCamera = new THREE.Vector3();
       for (let i = 0; i < count; i++) {
         const from = back + (0.15 + (0.7 * i) / count) * (front - back);
         const to = back + (0.15 + (0.7 * (i + 1)) / count) * (front - back);
-        const top = points
-          .filter((_, j) => (reach[j] ?? back) >= from && (reach[j] ?? back) < to)
-          .reduce<THREE.Vector3 | null>((best, point) => (!best || point.y > best.y ? point : best), null);
-        if (!top) {
+        const stretch = points.filter((_, j) => (reach[j] ?? back) >= from && (reach[j] ?? back) < to);
+        if (stretch.length === 0) {
           continue;
         }
-        const sprite = new THREE.Sprite(iconMaterial('mud', { bare: true }));
+        const middle = stretch.reduce((sum, point) => sum.add(point), new THREE.Vector3()).divideScalar(stretch.length);
+        const top = Math.max(...stretch.map((point) => point.y));
+        toCamera.set(camera.position.x - middle.x, 0, camera.position.z - middle.z).normalize();
+        // How far its side reaches out towards the camera.
+        const side = Math.max(...stretch.map((point) => point.clone().sub(middle).setY(0).dot(toCamera)));
+        // Drawn over the dinosaur, so its plates and spikes never hide the mud.
+        const sprite = new THREE.Sprite(mudMaterial);
+        sprite.renderOrder = 1;
         sprite.scale.setScalar(MUD_SIZE);
-        sprite.position.copy(top).setY(top.y + 0.2);
+        sprite.position
+          .copy(middle)
+          .addScaledVector(toCamera, side)
+          .setY(middle.y + 0.35 * (top - middle.y));
         scene.add(sprite);
         splats.push({ sprite, mud: 1 });
       }
@@ -124,9 +149,7 @@ export function createWashing(scene: THREE.Scene, camera: THREE.Camera, canvas: 
       }
       const moved = Math.hypot(clientX - last.x, clientY - last.y);
       last = { x: clientX, y: clientY };
-      const near = splats.find(
-        ({ sprite, mud }) => mud > 0 && screenGap(canvas, camera, sprite.position, clientX, clientY) <= RUB_PX,
-      );
+      const near = splatAt(clientX, clientY);
       if (near) {
         pointerAt(canvas, camera, near.sprite.position, clientX, clientY, sponge.position);
         sponge.visible = true;
