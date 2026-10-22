@@ -10,10 +10,9 @@ same PR when a decision changes.
 
 - **`master` is the default branch.** Branch from `origin/master` and open a PR; don't push to
   `master`.
-- **Open PRs ready for review, not as drafts.** Claude reviews every non-draft PR on each push, from
-  the org `Workflows` ruleset's `claude-review.yaml` for a PR into `master` and from `claude.yaml`
-  for one into any other branch. A draft gets no review, and the ruleset reviews one marked ready
-  only on its next push.
+- **Open PRs ready for review, not as drafts.** Claude reviews every non-draft PR into `master` on
+  each push, from the org `Workflows` ruleset's `claude-review.yaml`. A draft gets no review, and
+  the ruleset reviews one marked ready only on its next push.
 - **Keep PRs small enough to review in full** — roughly under 1,500 changed lines (excluding
   `pnpm-lock.yaml`) and one concern each. Split big work into a stack of PRs, each based on the one
   before; when a lower one is squash-merged, rebase the rest onto `master`.
