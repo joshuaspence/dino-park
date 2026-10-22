@@ -8,15 +8,19 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "vite",
+    "budget": "node scripts/check-budget.mjs",
     "build": "tsc --noEmit && vite build",
+    "dev": "vite",
+    "lint": "npm-run-all --continue-on-error --parallel --print-label 'lint:!(fix)'",
+    "lint:fix": "npm-run-all --print-label --serial lint:js:fix lint:prettier:fix",
+    "lint:js": "eslint .",
+    "lint:js:fix": "eslint --fix .",
+    "lint:prettier": "prettier --check .",
+    "lint:prettier:fix": "prettier --write .",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . && prettier --check .",
-    "format": "prettier --write .",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "budget": "node scripts/check-budget.mjs"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "idb-keyval": "6.3.0",
@@ -40,6 +44,7 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.13.0",
     "meshoptimizer": "1.3.0",
+    "npm-run-all2": "^9.0.4",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "6.0.3",

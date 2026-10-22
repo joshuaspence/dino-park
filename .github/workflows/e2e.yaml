@@ -1,0 +1,53 @@
+---
+name: 'End-to-end Test'
+
+on:
+  pull_request: {}
+  push:
+    branches: ['master']
+
+permissions:
+  contents: 'read'
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.ref }}'
+  cancel-in-progress: "${{ github.event_name == 'pull_request' }}"
+
+jobs:
+  all:
+    name: 'End-to-end Test'
+    needs: 'e2e'
+    if: 'always()'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - if: "needs.e2e.result != 'success'"
+        run: 'exit 1'
+
+  e2e:
+    name: '${{ matrix.browser }}'
+    runs-on: 'ubuntu-latest'
+    strategy:
+      fail-fast: false
+      matrix:
+        # The projects in `playwright.config.ts`.
+        browser:
+          - 'chromium'
+          - 'webkit'
+    steps:
+      - uses: 'actions/checkout@v7'
+      - uses: 'pnpm/action-setup@v6'
+      - uses: 'actions/setup-node@v7'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - run: 'pnpm install --frozen-lockfile'
+      - run: 'pnpm exec playwright install --with-deps ${{ matrix.browser }}'
+      - run: 'pnpm build'
+      - run: 'pnpm test:e2e --project ${{ matrix.browser }}'
+
+      - name: 'Upload Playwright report'
+        if: '${{ !cancelled() }}'
+        uses: 'actions/upload-artifact@v7'
+        with:
+          name: 'playwright-report-${{ matrix.browser }}'
+          path: 'playwright-report'
